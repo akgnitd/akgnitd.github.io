@@ -1,0 +1,11 @@
+@font-face {
+	font-family: '28DaysLater';
+	src: url('./28DaysLater.eot');
+	src: local('28DaysLater'), url('./28DaysLater.woff') format('woff'), url('./28DaysLater.ttf') format('truetype');
+}
+/* use this class to attach this font to any element i.e. <p class="fontsforweb_fontid_13599">Text with this font applied</p> */
+.fontsforweb_fontid_13599 {
+	font-family: '28DaysLater' !important;
+}
+
+/* Font downloaded from FontsForWeb.com */
