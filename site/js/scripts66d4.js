@@ -21,24 +21,24 @@ function Beercamper() {
   this.levelGuide = {
     '#intro' : 0,
     '#featuring' : 1,
-    '#sponsorz' : 2,
-    '#flip-cup' : 3,
-    '#teams' : 4
+    '#lostandextant' : 2,
+    '#vision' : 3,
+    '#works' : 4
   };
-  
+
   // cache some jQuery objects
   this.$window = $(window);
   this.$document = $(document);
-  
+
   // which method should be used to return CSS transform styles
-  this.getScrollTransform = Modernizr.csstransforms3d ? 
+  this.getScrollTransform = Modernizr.csstransforms3d ?
     this.getScroll3DTransform : this.getScroll2DTransform;
-  
+
   // bind constructor to window.scroll event
   if ( Modernizr.csstransforms ) {
     window.addEventListener( 'scroll', this, false);
   }
-  
+
 }
 
 // enables constructor to be used within event listener
@@ -60,13 +60,13 @@ Beercamper.prototype.getScroll3DTransform = function( scroll ) {
       // how close are we to the nearest level
       leveledZ = this.distance3d / 2 - Math.abs( ( z % this.distance3d ) - this.distance3d / 2 ),
       style;
-  
-  // if close to nearest level, 
+
+  // if close to nearest level,
   // ensures that text doesn't get fuzzy after nav is clicked
   if ( leveledZ < 5 ) {
     z = Math.round( z / this.distance3d ) * this.distance3d;
   }
-  
+
   return 'translate3d( 0, 0, ' + z + 'px )';
 };
 
@@ -79,7 +79,7 @@ Beercamper.prototype.scroll = function( event ) {
 
   // change current selection on nav
   this.currentLevel = Math.round( this.scrolled * (this.levels-1) );
-  
+
   if ( this.currentLevel !== this.previousLevel && this.$nav ) {
     this.$nav.find('.current').removeClass('current');
     if ( this.currentLevel < 5 ) {
@@ -87,7 +87,7 @@ Beercamper.prototype.scroll = function( event ) {
     }
     this.previousLevel = this.currentLevel;
   }
-  
+
 };
 
 // where the magic happens
@@ -128,7 +128,7 @@ Beercamper.prototype.click = function( event ) {
   }
 
   event.preventDefault();
-  
+
 };
 
 
@@ -172,10 +172,10 @@ $(function(){
       this.addEventListener( 'click', BCXI, false );
     });
   }
-   
+
   //  INCEPTION
   $('#totem').click(function(){
-    var $audio = $('<audio />', { 
+    var $audio = $('<audio />', {
       autoPlay : 'autoplay'
     });
 
@@ -195,7 +195,7 @@ $(function(){
     $('#intro h1').addClass('beerception').text('Beerception');
     $('#intro .blurb').text('A party within a dream');
   });
-  
+
 });
 
 

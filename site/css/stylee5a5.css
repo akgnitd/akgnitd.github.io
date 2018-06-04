@@ -9,9 +9,9 @@
 @font-face {
 	font-family: '28DaysLater';
 	src: url('../fonts/28DaysLater.eot');
-	src: local('â˜º'), 
-	  url('../fonts/28DaysLater.woff') format('woff'), 
-	  url('../fonts/28DaysLater.ttf') format('truetype'), 
+	src: local('â˜º'),
+	  url('../fonts/28DaysLater.woff') format('woff'),
+	  url('../fonts/28DaysLater.ttf') format('truetype'),
 	  url('../fonts/28DaysLater.svg#webfontp2bXIvvD') format('svg');
 	font-weight: normal;
 	font-style: normal;
@@ -20,9 +20,9 @@
 @font-face {
 	font-family: 'junction-bold';
 	src: url('junction-bold-webfont.html');
-	src: local('â˜º'), 
-	  url('../fonts/junction-bold.woff') format('woff'), 
-	  url('../fonts/junction-bold.ttf') format('truetype'), 
+	src: local('â˜º'),
+	  url('../fonts/junction-bold.woff') format('woff'),
+	  url('../fonts/junction-bold.ttf') format('truetype'),
 	  url('../fonts/junction-bold.svg#webfontecycPgIx') format('svg');
 	font-weight: normal;
 	font-style: normal;
@@ -31,8 +31,8 @@
 @font-face {
 	font-family: 'junction-bold Light';
 	src: url('../fonts/28DaysLater.eot');
-	src: local('â˜º'), 
-	  url('../fonts/28DaysLater.woff') format('woff'), 
+	src: local('â˜º'),
+	  url('../fonts/28DaysLater.woff') format('woff'),
 	  url('../fonts/28DaysLater.ttf') format('truetype'),
 	  url('../fonts/28DaysLater.svg#webfontnHVzXbDa') format('svg');
 	font-weight: normal;
@@ -181,7 +181,7 @@ html, body {
 }
 
 #container {
-  margin: 0 auto;  
+  margin: 0 auto;
   width: 990px;
 }
 
@@ -196,7 +196,7 @@ html, body {
   position: absolute;
   width: 100%;
   height: 100%;
-  
+
 }
 
 #content {
@@ -286,7 +286,7 @@ a:hover {
           transform: scale(0.3333);
 }
 
-.faux3d #sponsorz {
+.faux3d #lostandextant {
   -webkit-transform: scale(0.1111);
      -moz-transform: scale(0.1111);
       -ms-transform: scale(0.1111);
@@ -294,7 +294,7 @@ a:hover {
           transform: scale(0.1111);
 }
 
-.faux3d #flip-cup {
+.faux3d #vision {
   -webkit-transform: scale(0.037);
      -moz-transform: scale(0.037);
       -ms-transform: scale(0.037);
@@ -302,7 +302,7 @@ a:hover {
           transform: scale(0.037);
 }
 
-.faux3d #teams {
+.faux3d #works {
   -webkit-transform: scale(0.01234);
      -moz-transform: scale(0.01234);
       -ms-transform: scale(0.01234);
@@ -354,7 +354,7 @@ a:hover {
 }
 
 
-.csstransforms3d #sponsorz {
+.csstransforms3d #lostandextant {
   -webkit-transform: translate3d( 0, 0, -2000px );
      -moz-transform: translate3d( 0, 0, -2000px );
       -ms-transform: translate3d( 0, 0, -2000px );
@@ -363,7 +363,7 @@ a:hover {
 }
 
 
-.csstransforms3d #flip-cup {
+.csstransforms3d #vision {
   -webkit-transform: translate3d( 0, 0, -3000px );
      -moz-transform: translate3d( 0, 0, -3000px );
       -ms-transform: translate3d( 0, 0, -3000px );
@@ -371,7 +371,7 @@ a:hover {
           transform: translate3d( 0, 0, -3000px );
 }
 
-.csstransforms3d #teams {
+.csstransforms3d #works {
   -webkit-transform: translate3d( 0, 0, -4000px );
      -moz-transform: translate3d( 0, 0, -4000px );
       -ms-transform: translate3d( 0, 0, -4000px );
@@ -608,10 +608,10 @@ a:hover {
 }
 
 #credit a {
-  color: black; 
+  color: black;
   display: block;
   padding-left: 10px;
-  background: url('../img/sponsors.png') -130px -566px;
+  background: url('../img/.png') -130px -566px;
 }
 #credit a:hover { background-color: grey;}
 
@@ -731,7 +731,7 @@ a:hover {
 }
 
 #featuring .a5 .badge {
-  font-size: 20px; 
+  font-size: 20px;
   text-align: center;
   line-height: 32px;
   background: #223;
@@ -749,13 +749,13 @@ a:hover {
 
 /***************** LOST AND EXTANT  *****************/
 
-#content #sponsorz h1 {
+#content #lostandextant h1 {
   font-size: 120px;
   line-height: 0.8em;
   margin-top: 27px;
 }
 
-#sponsorz .a5 {
+#lostandextant .a5 {
   position: absolute;
   width: 100%;
   bottom: 0;
@@ -764,33 +764,33 @@ a:hover {
   text-align: center;
 }
 
-#sponsorz .a5 strong {
+#lostandextant .a5 strong {
   font-weight: normal;
   font-family: 'junction-bold', 'Helvetica Neue', Arial, sans-serif;
 }
 
-#sponsorz .a5 a {
+#lostandextant .a5 a {
   background: white;
   color: #DD0;
   padding: 0.1em 0.3em;
   font-family: 'junction-bold', 'Helvetica Neue', Arial, sans-serif;
 }
 
-#sponsorz .a5 a:hover {
+#lostandextant .a5 a:hover {
   background: #B20;
 }
 
 /* Sponsor list */
 /*
 
-#sponsorz .spnsr-list {
+#lostandextant .spnsr-list {
   list-style: none;
   margin: 0;
   position: absolute;
   top: 120px;
 }
 
-#sponsorz .spnsr-list li {
+#lostandextant .spnsr-list li {
   position: absolute;
   width: 310px;
   height: 100px;
@@ -798,44 +798,44 @@ a:hover {
   text-align: center;
 }
 
-#sponsorz .spnsr-list li.half { width: 145px; }
+#lostandextant .spnsr-list li.half { width: 145px; }
 
-#sponsorz .spnsr-list li.n2 { left: 330px; }
-#sponsorz .spnsr-list li.n5 { left: 165px; }
-#sponsorz .spnsr-list li.n7,
-#sponsorz .spnsr-list li.n10 { left: 825px; }
-#sponsorz .spnsr-list li.n3,
-#sponsorz .spnsr-list li.n6,
-#sponsorz .spnsr-list li.n9 { left: 660px; }
-#sponsorz .spnsr-list li.n4,
-#sponsorz .spnsr-list li.n5,
-#sponsorz .spnsr-list li.n6,
-#sponsorz .spnsr-list li.n7 { top: 120px; }
-#sponsorz .spnsr-list li.n8,
-#sponsorz .spnsr-list li.n9,
-#sponsorz .spnsr-list li.n10 { top: 240px; }
+#lostandextant .spnsr-list li.n2 { left: 330px; }
+#lostandextant .spnsr-list li.n5 { left: 165px; }
+#lostandextant .spnsr-list li.n7,
+#lostandextant .spnsr-list li.n10 { left: 825px; }
+#lostandextant .spnsr-list li.n3,
+#lostandextant .spnsr-list li.n6,
+#lostandextant .spnsr-list li.n9 { left: 660px; }
+#lostandextant .spnsr-list li.n4,
+#lostandextant .spnsr-list li.n5,
+#lostandextant .spnsr-list li.n6,
+#lostandextant .spnsr-list li.n7 { top: 120px; }
+#lostandextant .spnsr-list li.n8,
+#lostandextant .spnsr-list li.n9,
+#lostandextant .spnsr-list li.n10 { top: 240px; }
 
-#sponsorz .spnsr-list li a {
+#lostandextant .spnsr-list li a {
   background-image: url('../img/sponsors.png');
   height: 100%;
   display: block;
 }
 
-#sponsorz .spnsr-list li a:hover { background-color: white; }
+#lostandextant .spnsr-list li a:hover { background-color: white; }
 
-#sponsorz .family       { background-position: 0      0; }
-#sponsorz .nclud         { background-position: 0 -100px; }
-#sponsorz .pruf          { background-position: 0 -200px; }
-#sponsorz .browser-media { background-position: 0 -300px; }
+#lostandextant .family       { background-position: 0      0; }
+#lostandextant .nclud         { background-position: 0 -100px; }
+#lostandextant .pruf          { background-position: 0 -200px; }
+#lostandextant .browser-media { background-position: 0 -300px; }
 
-#sponsorz .hanerino      { background-position:   -5px -400px; }
-#sponsorz .argyle        { background-position: -160px -400px; }
-#sponsorz .bold          { background-position:   -8px -600px; }
-#sponsorz .howaboutwe    { background-position: -160px -600px; }
-#sponsorz .function      { background-position:   -5px -700px; }
-#sponsorz .hashrocket    { background-position: -164px -700px; }  */
+#lostandextant .hanerino      { background-position:   -5px -400px; }
+#lostandextant .argyle        { background-position: -160px -400px; }
+#lostandextant .bold          { background-position:   -8px -600px; }
+#lostandextant .howaboutwe    { background-position: -160px -600px; }
+#lostandextant .function      { background-position:   -5px -700px; }
+#lostandextant .hashrocket    { background-position: -164px -700px; }  */
 
-#sponsorz .spnsr-list li.open {
+#lostandextant .spnsr-list li.open {
   font-size: 18px;
   text-transform: uppercase;
   line-height: 100px;
@@ -846,7 +846,7 @@ a:hover {
 
 /* fontfabric link */
 
-#sponsorz .fontfabric {
+#lostandextant .fontfabric {
   width: 310px;
   height: 40px;
   margin: 10px;
@@ -859,20 +859,20 @@ a:hover {
   text-transform: uppercase;
 }
 
-#sponsorz .fontfabric b { 
+#lostandextant .fontfabric b {
   font-family: 'junction-bold', 'Helvetica Neue', Arial, sans-serif;
   font-weight: normal;
   font-size: 26px;
   text-transform: none;
 }
 
-#sponsorz .fontfabric a {
+#lostandextant .fontfabric a {
   display: block;
   background: white;
   color: #223;
 }
 
-#sponsorz .fontfabric a:hover {
+#lostandextant .fontfabric a:hover {
   background: #B20;
   color: #DD0;
 }
@@ -881,33 +881,33 @@ a:hover {
 
 /***************** Flip Cup  *****************/
 
-#content #flip-cup h1 {
+#content #vision h1 {
   font-size: 146px;
 }
 
-#flip-cup h1 .tournament,
-#teams    h1 .tournament {
+#vision h1 .tournament,
+#works    h1 .tournament {
   display: inline-block;
   font-size: 69px;
   line-height: 0.8em;
 }
 
-#flip-cup h1 .tournament span,
-#teams    h1 .tournament span {
+#vision h1 .tournament span,
+#works    h1 .tournament span {
   display: block;
 }
 
 
-#flip-cup .arrow {
+#vision .arrow {
   position: absolute;
-  
+
   font-size: 60px;
   width: 200px;
   left: 395px;
   top: 150px;
 }
 
-#flip-cup .arrow a {
+#vision .arrow a {
   display: block;
   background: white;
   color: grey;
@@ -918,16 +918,16 @@ a:hover {
   font-family: '28DaysLater', 'Helvetica Neue', Arial, sans-serif;
 }
 
-#flip-cup .arrow a span {
+#vision .arrow a span {
   z-index: 2;
   position: relative;
 }
 
-#flip-cup .arrow a .sign-up {
+#vision .arrow a .sign-up {
   font-size: 40px;
 }
 
-#flip-cup .arrow a:after {
+#vision .arrow a:after {
   content: '';
   display: block;
   border-style: solid;
@@ -939,16 +939,16 @@ a:hover {
   z-index: 1;
 }
 
-#flip-cup .arrow a:hover {
+#vision .arrow a:hover {
   background: #B20;
 }
 
-#flip-cup .arrow a:hover:after {
+#vision .arrow a:hover:after {
   border-color: #B20 transparent;
 }
 
 
-#flip-cup .rules-title {
+#vision .rules-title {
   font-weight: normal;
   font-family: '28DaysLater', 'Helvetica Neue', Arial, sans-serif;
   text-transform: uppercase;
@@ -964,7 +964,7 @@ a:hover {
   left: 340px;
 }
 
-#flip-cup .rules-title:after {
+#vision .rules-title:after {
   content: '';
   display: block;
   border-style: solid;
@@ -977,19 +977,19 @@ a:hover {
 
 
 
-#flip-cup .rules {
+#vision .rules {
   width: 315px;
   position: absolute;
   top: 150px;
   left: 675px;
 }
 
-#flip-cup .rules ul {
+#vision .rules ul {
   list-style: none;
   margin: 0;
 }
 
-#flip-cup .rules li {
+#vision .rules li {
   font-family: 'junction-bold', 'junction-bold', 'junction-bold', 'junction-bold', Arial, sans-serif;
   font-size: 12px;
   line-height: 1.4em;
@@ -999,16 +999,16 @@ a:hover {
   background: #223;
 }
 
-#flip-cup .rules li:last-child { border-bottom: none; }
+#vision .rules li:last-child { border-bottom: none; }
 
-#flip-cup .copy {
+#vision .copy {
   width: 290px;
   position: absolute;
   left: 10px;
   top: 180px;
 }
 
-#flip-cup .copy h3 {
+#vision .copy h3 {
   font-family: '28DaysLater', 'Helvetica Neue', Arial, sans-serif;
   text-transform: uppercase;
   font-weight: normal;
@@ -1017,7 +1017,7 @@ a:hover {
   margin-bottom: 20px;
 }
 
-#flip-cup .copy p {
+#vision .copy p {
   font-size: 18px;
   margin-bottom: 0.8em;
 }
@@ -1060,20 +1060,20 @@ a:hover {
 
 
 
-/***************** Teams  *****************/
+/***************** works  *****************/
 
-#content #teams h1 {
+#content #works h1 {
   position: relative;
   top: 40px;
 }
 
-#teams h1 span {
+#works h1 span {
   display: block !important;
   line-height: 0.8em;
   font-size: 80px !important;
 }
 
-#teams .team-list {
+#works .team-list {
   position: absolute;
   top: 30px;
   height: 510px;
@@ -1085,7 +1085,7 @@ a:hover {
   border-bottom: 2px solid;*/
 }
 
-/* scroll bar  
+/* scroll bar
   Thnx Tim Van Damme & http://almaer.com/scrollbar/debug.html */
 
 .team-list::-webkit-scrollbar {
@@ -1116,21 +1116,21 @@ a:hover {
 
 
 
-#teams .team-list .team {
+#works .team-list .team {
   width: 310px;
   margin: 10px;
   text-align: center;
 }
-#teams .team-list .team-a { 
-  float: left; 
-  clear: left; 
+#works .team-list .team-a {
+  float: left;
+  clear: left;
 }
-#teams .team-list .team-b { 
-  float: right; 
-  clear: right; 
+#works .team-list .team-b {
+  float: right;
+  clear: right;
 }
 
-#teams .team-list .team h2 {
+#works .team-list .team h2 {
   font-weight: normal;
   font-size: 26px;
   line-height: 1.0em;
@@ -1140,17 +1140,17 @@ a:hover {
   text-transform: normal;
 }
 
-#teams .team-list .team .player-list {
+#works .team-list .team .player-list {
   list-style: none;
   margin: 0;
 }
 
-#teams .team-list .team .player {
+#works .team-list .team .player {
   font-size: 16px;
   padding: 2px 0;
 }
 
-#teams .team-list .team .player a {
+#works .team-list .team .player a {
   font-family: 'junction-bold', 'Helvetica Neue', Arial, sans-serif;
   font-size: 14px;
 }
@@ -1272,7 +1272,7 @@ body.sign-up { background-color: #223; }
 }
 
 .csstransforms .sign-up #content,
-.csstransforms .sign-up #nav { 
+.csstransforms .sign-up #nav {
   opacity: 0.3;
   pointer-events: none;
 }
@@ -1298,5 +1298,3 @@ body.sign-up { background-color: #223; }
    p, h2, h3 { orphans: 3; widows: 3; }
    h2, h3{ page-break-after: avoid; }
  }
-
-
