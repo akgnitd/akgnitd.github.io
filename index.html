@@ -1,26 +1,46 @@
-<!DOCTYPE html>
+<!DOCTYPE HTML>
 <html>
+	<head>
+		<title>Envision</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+		<link rel="stylesheet" href="assets/css/main.css" />
+		<noscript><link rel="stylesheet" href="assets/css/noscript.css" /></noscript>
+	</head>
+	<body class="is-preload">
+		<div id="wrapper">
+			<div id="bg"></div>
+			<div id="overlay"></div>
+			<div id="main">
 
-<body>
-        <style>
-        body
+				<!-- Header -->
+					<header id="header">
+						<h1>Atul Kumar Gupta</h1>
+						<p>Software Developer &nbsp;&bull;&nbsp; Architect &nbsp;&bull;&nbsp; Never asked for this</p>
+						<nav>
+							<ul>
+								<li><a href="https://twitter.com/atulgupta_7" class="icon fa-twitter" target="_blank"><span class="label">Twitter</span></a></li>
+								<li><a href="https://www.facebook.com/akgnit7" class="icon fa-facebook" target="_blank"><span class="label">Facebook</span></a></li>
+								<li><a href="https://www.instagram.com/atulgupta_7/" class="icon fa-instagram" target="_blank"><span class="label">Instagram</span></a></li>
+								<li><a href="https://github.com/akgnit" class="icon fa-github" target="_blank"><span class="label">Github</span></a></li>
+								<li><a href="https://www.linkedin.com/in/akgnit/" class="icon fa-linkedin" target="_blank"><span class="label">Linkedin</span></a></li>
+								<li><a href="https://angel.co/akgnit" class="icon fa-angellist" target="_blank"><span class="label">AngelList</span></a></li>
+								<li><a href="#" class="icon fa-envelope-o"><span class="label">Email</span></a></li>
+							</ul>
+						</nav>
+					</header>
 
-        {
-          background-color: grey;
-          background-image: url("https://s19.postimg.org/ouiezxaj7/widescreen_wallpaper_11.jpg");
-          text-align:center;
-        }
+				<!-- Footer -->
+					<footer id="footer">
+						<span class="copyright">&copy; akgnit7. 2019: <a href="#">simplicity</a>.</span>
+					</footer>
 
- </style>
-
-
-<h1 style="color:white;font-family: 'Amaranth', sans-serif;font-size: 40px;">Welcome GitHub </h1>
-
-<a HREF="site/index.html"><span style="color:white;font-family:'Amaranth', sans-serif;font-size: 20px;"><b>Proceed to Typhoon</b></span></a>
-<hr>
-<iframe width="100%" height="300px" src="site/index.html" name="iframe_a"></iframe>
-
-<p><span style="color:white;font-family:'Amaranth', sans-serif;font-size: 20px;"><b>an akgnit creation</b></span></p>
-
-</body>
+			</div>
+		</div>
+		<script>
+			window.onload = function() { document.body.classList.remove('is-preload'); }
+			window.ontouchmove = function() { return false; }
+			window.onorientationchange = function() { document.body.scrollTop = 0; }
+		</script>
+	</body>
 </html>
