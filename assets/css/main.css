@@ -194,10 +194,10 @@ input, select, textarea {
 /* BG */
 
 	#bg {
-		-moz-animation: bg 60s linear infinite;
-		-webkit-animation: bg 60s linear infinite;
-		-ms-animation: bg 60s linear infinite;
-		animation: bg 60s linear infinite;
+		-moz-animation: bg 30s linear infinite;
+		-webkit-animation: bg 30s linear infinite;
+		-ms-animation: bg 30s linear infinite;
+		animation: bg 30s linear infinite;
 		-moz-backface-visibility: hidden;
 		-webkit-backface-visibility: hidden;
 		-ms-backface-visibility: hidden;
