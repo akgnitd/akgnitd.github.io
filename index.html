@@ -8,40 +8,193 @@
 		<noscript><link rel="stylesheet" href="assets/css/noscript.css" /></noscript>
 	</head>
 	<body class="is-preload">
+		<!-- Navigation -->
+		<nav id="nav">
+			<div class="nav-container">
+				<a href="#wrapper" class="logo">AKG</a>
+				<ul>
+					<li><a href="#about">About</a></li>
+					<li><a href="#skills">Skills</a></li>
+					<li><a href="#portfolio">Portfolio</a></li>
+					<li><a href="#experience">Experience</a></li>
+					<li><a href="#blog">Blog</a></li>
+				</ul>
+				<a href="Atul_Gupta_Resume.pdf" class="nav-btn" download>Resume</a>
+			</div>
+		</nav>
+
 		<div id="wrapper">
 			<div id="bg"></div>
 			<div id="overlay"></div>
+			
 			<div id="main">
-
-				<!-- Header -->
+				<!-- Hero Section -->
+				<section id="hero">
 					<header id="header">
 						<h1>Atul Gupta</h1>
-						<p>Senior Software Engineer &nbsp;&bull;&nbsp; Architect &nbsp;&bull;&nbsp; Never asked for this</p>
-						<nav>
+						<p>Engineering Manager @ Credit Saison &nbsp;&bull;&nbsp; Tech Architect &nbsp;&bull;&nbsp; Alumnus NIT Durgapur</p>
+						<!-- buttons removed per request -->
+						<nav class="social-nav">
 							<ul>
 								<li><a href="https://twitter.com/akgnitd" class="icon fa-twitter" target="_blank"><span class="label">Twitter</span></a></li>
 								<li><a href="https://www.facebook.com/akgnitd" class="icon fa-facebook" target="_blank"><span class="label">Facebook</span></a></li>
 								<li><a href="https://www.instagram.com/atulgupta_7/" class="icon fa-instagram" target="_blank"><span class="label">Instagram</span></a></li>
 								<li><a href="https://github.com/akgnitd" class="icon fa-github" target="_blank"><span class="label">Github</span></a></li>
 								<li><a href="https://www.linkedin.com/in/akgnitd/" class="icon fa-linkedin" target="_blank"><span class="label">Linkedin</span></a></li>
-								<li><a href="https://angel.co/akgnitd" class="icon fa-angellist" target="_blank"><span class="label">AngelList</span></a></li>
-								<li><a href="https://stackoverflow.com/users/6405924/akgnitd" class="icon fa-stack-overflow" target="_blank"><span class="label">Stack Overflow</span></a></li>
-								<li><a href="mailto:akgnit7@gmail.com?subject=Me&body=Hello!" class="icon fa-envelope-o"><span class="label">Email</span></a></li>
+								<li><a href="mailto:akgnit7@gmail.com" class="icon fa-envelope-o"><span class="label">Email</span></a></li>
 							</ul>
 						</nav>
 					</header>
+				</section>
+
+				<!-- About Section -->
+				<section id="about" class="content-section">
+					<div class="glass-container reveal">
+						<h2>About Me</h2>
+						<p>I am an experienced IT professional and Engineering Manager with a strong background in software engineering and technical leadership. My expertise spans building scalable enterprise systems using <strong>Java, Go, Python, and Kotlin</strong>. I have a deep passion for <strong>Machine Learning, Cloud Computing, and Natural Language Processing (NLP)</strong>. Currently, I lead engineering teams at <strong>Credit Saison India</strong> to deliver complex FinTech solutions. My journey from an alumnus of <strong>NIT Durgapur</strong> to an EM has been driven by a commitment to architectural excellence and high-impact software delivery.</p>
+					</div>
+				</section>
+
+				<!-- Bento Grid (Skills) -->
+				<section id="skills" class="content-section">
+					<div class="bento-grid reveal">
+						<div class="bento-item large glass-card">
+							<i class="fa fa-server"></i>
+							<h3>Backend & Systems</h3>
+							<p>Expert in Java (Spring Boot), Golang, and Distributed Systems. Specialist in high-throughput validation engines and microservices architecture.</p>
+						</div>
+						<div class="bento-item medium glass-card">
+							<i class="fa fa-brain"></i>
+							<h3>AI & ML</h3>
+							<p>Deep dive into Natural Language Processing (NLP) and Machine Learning models. Experience in data collection and processing with Python.</p>
+						</div>
+						<div class="bento-item small glass-card">
+							<i class="fa fa-mobile"></i>
+							<h3>Mobile</h3>
+							<p>Kotlin & Mobile App Development.</p>
+						</div>
+						<div class="bento-item small glass-card">
+							<i class="fa fa-cloud"></i>
+							<h3>Cloud</h3>
+							<p>AWS, Docker, K8s.</p>
+						</div>
+						<div class="bento-item medium glass-card">
+							<i class="fa fa-search"></i>
+							<h3>Data & Search</h3>
+							<p>Scaling search and data layers with ElasticSearch, MongoDB, and performance testing using Jmeter.</p>
+						</div>
+					</div>
+				</section>
+
+				<!-- Portfolio Section -->
+				<section id="portfolio" class="content-section">
+					<h2 class="reveal">Featured Projects</h2>
+					<div class="project-grid reveal">
+						<div class="project-card glass-card">
+							<h3>DND Check</h3>
+							<p>Utility tool for checking DND status of numbers.</p>
+							<div class="tags"><span>HTML</span><span>JS</span></div>
+							<a href="https://github.com/akgnitd/DND_Check" target="_blank" class="project-link">View Project</a>
+						</div>
+						<div class="project-card glass-card">
+							<h3>PINCODE Details</h3>
+							<p>Fetch real-time location details based on Pincodes.</p>
+							<div class="tags"><span>API</span><span>JS</span></div>
+							<a href="https://github.com/akgnitd/PINCODE_details" target="_blank" class="project-link">View Project</a>
+						</div>
+						<div class="project-card glass-card">
+							<h3>Catalog Service</h3>
+							<p>Java-based microservice for enterprise catalogues.</p>
+							<div class="tags"><span>Java</span><span>Spring</span></div>
+							<a href="https://github.com/akgnitd/catalog-service" target="_blank" class="project-link">View Project</a>
+						</div>
+						<div class="project-card glass-card">
+							<h3>Yavi-Schema</h3>
+							<p>JSON Schema validation logic and NetworkNT integration.</p>
+							<div class="tags"><span>Java</span><span>JSON</span></div>
+							<a href="https://github.com/akgnitd" target="_blank" class="project-link">View Project</a>
+						</div>
+					</div>
+				</section>
+
+				<!-- Experience Section -->
+				<section id="experience" class="content-section">
+					<h2 class="reveal">Career Path</h2>
+					<div class="timeline reveal">
+						<div class="timeline-item left glass-card">
+							<span class="date">Oct 2025 - Present</span>
+							<h3>Engineering Manager</h3>
+							<h4>Credit Saison India</h4>
+							<p>Leading high-impact engineering teams in the FinTech space, focusing on architectural strategy and scalable lending platforms.</p>
+						</div>
+						<div class="timeline-item right glass-card">
+							<span class="date">Oct 2024 - Oct 2025</span>
+							<h3>Associate Engineering Manager</h3>
+							<h4>Credit Saison India</h4>
+							<p>Managed core services and validation engines. Bridged technical design with delivery excellence.</p>
+						</div>
+						<div class="timeline-item left glass-card">
+							<span class="date">Prior to 2024</span>
+							<h3>Senior Software Engineer</h3>
+							<h4>Altisource</h4>
+							<p>Designed and developed enterprise-scale software solutions for the real estate and mortgage industry.</p>
+						</div>
+						<div class="timeline-item right glass-card">
+							<span class="date">NIT Durgapur</span>
+							<h3>Education</h3>
+							<h4>B.Tech Alumnus</h4>
+							<p>Foundation in computer science and engineering principles.</p>
+						</div>
+					</div>
+				</section>
+
+				<!-- Blog Section -->
+				<section id="blog" class="content-section">
+					<h2 class="reveal">Technical Insights</h2>
+					<div class="blog-grid reveal">
+						<a href="blogs/scaling-with-golang.html" class="blog-card glass-card">
+							<h3>Scaling with Golang</h3>
+							<p>A deep dive into why we transitioned our mission-critical validation engines to Go. We achieved a 40% reduction in latency by leveraging Go's lightweight goroutines and efficient memory management for high-concurrency workloads.</p>
+							<span class="read-more">Read Full Article <i class="fa fa-arrow-right"></i></span>
+						</a>
+						<a href="blogs/nlp-in-fintech.html" class="blog-card glass-card">
+							<h3>NLP in FinTech</h3>
+							<p>How we utilize Natural Language Processing to automate risk assessment. By implementing custom NER models with Python and spaCy, we've increased our document processing throughput by 3x while maintaining 98% accuracy in entity extraction from financial statements.</p>
+							<span class="read-more">Read Full Article <i class="fa fa-arrow-right"></i></span>
+						</a>
+						<a href="blogs/the-em-shift.html" class="blog-card glass-card">
+							<h3>The EM Shift</h3>
+							<p>Reflections on transitioning from Staff Engineer to Engineering Manager. Balancing technical debt with feature delivery requires a shift in mindset: from "how can I fix this" to "how can I empower the team to build a sustainable solution".</p>
+							<span class="read-more">Read Full Article <i class="fa fa-arrow-right"></i></span>
+						</a>
+					</div>
+				</section>
 
 				<!-- Footer -->
-					<footer id="footer">
-						<span class="copyright">&copy; akgnitd. 2022: <a href="#">simplicity</a>.</span>
-					</footer>
-
+				<footer id="footer">
+					<span class="copyright">&copy; akgnitd. 2026: <a href="#">Premium Redesign</a>.</span>
+				</footer>
 			</div>
 		</div>
+
 		<script>
 			window.onload = function() { document.body.classList.remove('is-preload'); }
-			window.ontouchmove = function() { return false; }
-			window.onorientationchange = function() { document.body.scrollTop = 0; }
+			
+			// ScrollReveal Animation
+			function reveal() {
+				var reveals = document.querySelectorAll(".reveal");
+				for (var i = 0; i < reveals.length; i++) {
+					var windowHeight = window.innerHeight;
+					var elementTop = reveals[i].getBoundingClientRect().top;
+					var elementVisible = 150;
+					if (elementTop < windowHeight - elementVisible) {
+						reveals[i].classList.add("active");
+					} else {
+						reveals[i].classList.remove("active");
+					}
+				}
+			}
+			window.addEventListener("scroll", reveal);
 		</script>
 	</body>
 </html>

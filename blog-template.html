@@ -1,0 +1,106 @@
+<!DOCTYPE HTML>
+<html>
+	<head>
+		<title>{TITLE} | AKG Technical Blog</title>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+		<link rel="stylesheet" href="../assets/css/main.css" />
+		<style>
+			#wrapper {
+				background: #05070a;
+				min-height: 100vh;
+				padding-top: 120px;
+			}
+			.blog-header {
+				text-align: center;
+				margin-bottom: 4rem;
+				padding: 0 2rem;
+			}
+			.blog-header h1 {
+				font-size: 4.5rem;
+				margin-bottom: 1rem;
+			}
+			.blog-meta {
+				font-family: 'Outfit', sans-serif;
+				color: rgba(255, 255, 255, 0.5);
+				font-size: 1rem;
+				letter-spacing: 0.1em;
+				text-transform: uppercase;
+			}
+			.blog-content {
+				max-width: 900px;
+				margin: 0 auto 10rem auto;
+				padding: 4rem;
+				background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0) 100%);
+				backdrop-filter: blur(40px);
+				-webkit-backdrop-filter: blur(40px);
+				border: 1px solid rgba(255, 255, 255, 0.08);
+				border-radius: 40px;
+				box-shadow: 0 40px 100px rgba(0, 0, 0, 0.6);
+			}
+			.blog-content p {
+				font-size: 1.25rem;
+				line-height: 2;
+				margin-bottom: 2rem;
+				color: rgba(255, 255, 255, 0.85);
+			}
+			.blog-content h2 {
+				margin-top: 4rem;
+				margin-bottom: 1.5rem;
+				font-size: 2.25rem;
+			}
+			.back-link {
+				display: inline-block;
+				margin-bottom: 3rem;
+				color: #fff;
+				text-decoration: none;
+				font-family: 'Outfit', sans-serif;
+				font-weight: 500;
+				font-size: 0.9rem;
+				letter-spacing: 0.1em;
+				text-transform: uppercase;
+				transition: opacity 0.3s;
+				border: none !important;
+			}
+			.back-link:hover {
+				opacity: 0.6;
+			}
+			.back-link i {
+				margin-right: 0.5rem;
+			}
+		</style>
+	</head>
+	<body class="is-preload">
+		<!-- Navigation -->
+		<nav id="nav">
+			<div class="nav-container">
+				<a href="../index.html" class="logo">AKG</a>
+				<ul>
+					<li><a href="../index.html#blog">All Posts</a></li>
+				</ul>
+				<a href="../Atul_Gupta_Resume.pdf" class="nav-btn" download>Resume</a>
+			</div>
+		</nav>
+
+		<div id="wrapper">
+			<div class="blog-header">
+				<a href="../index.html#blog" class="back-link"><i class="fa fa-arrow-left"></i> Back to Home</a>
+				<div class="blog-meta">{DATE} • {READING_TIME} Read</div>
+				<h1>{TITLE}</h1>
+			</div>
+
+			<article class="blog-content">
+				{CONTENT}
+			</article>
+
+			<!-- Footer -->
+			<footer id="footer" style="padding: 4rem 0;">
+				<span class="copyright">&copy; akgnitd. 2026: <a href="../index.html">Portfolio</a>.</span>
+			</footer>
+		</div>
+
+		<script>
+			window.onload = function() { document.body.classList.remove('is-preload'); }
+		</script>
+	</body>
+</html>
