@@ -85,7 +85,7 @@ body {
   font-size: 16px;
   line-height: 1.7;
   color: var(--color-text);
-  background: var(--color-bg);
+  background: transparent;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -346,35 +346,17 @@ h1, h2, h3, h4, h5, h6 {
   overflow: hidden;
 }
 
-/* Subtle gradient orbs behind hero */
-.hero::before,
-.hero::after {
-  content: '';
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(120px);
-  opacity: 0.4;
+/* ---------- Interactive Antigravity Canvas ---------- */
+.bg-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -1;
   pointer-events: none;
+  background: var(--color-bg);
+  transition: background 0.5s var(--ease-out);
 }
-
-.hero::before {
-  width: 600px;
-  height: 600px;
-  background: var(--accent-glow);
-  top: -200px;
-  right: -200px;
-}
-
-.hero::after {
-  width: 400px;
-  height: 400px;
-  background: rgba(168, 85, 247, 0.15);
-  bottom: -100px;
-  left: -100px;
-}
-
-[data-theme="light"] .hero::before { opacity: 0.2; }
-[data-theme="light"] .hero::after { opacity: 0.1; }
 
 .hero .container {
   display: flex;
@@ -1243,5 +1225,5 @@ h1, h2, h3, h4, h5, h6 {
 @media print {
   .navbar, .theme-toggle, .menu-toggle, .mobile-overlay { display: none !important; }
   body { background: #fff; color: #111; }
-  .hero::before, .hero::after { display: none; }
+  .bg-canvas { display: none !important; }
 }

@@ -41,6 +41,8 @@
 </head>
 <body>
 
+<canvas id="bg-canvas" class="bg-canvas"></canvas>
+
 <nav class="navbar" id="navbar">
   <div class="container">
     <a href="../index.html" class="nav-logo">atul<span>.</span></a>
@@ -56,6 +58,7 @@
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Resume
       </a> -->
+      <button id="bgSwitcher" class="btn" style="padding: 0.5rem 0.9rem; margin-right: 0.5rem;" onclick="window.toggleBackgroundMode && window.toggleBackgroundMode()" title="Cycle Background Animation">🌍</button>
       <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark/light mode">
         <span class="icon-moon">🌙</span>
         <span class="icon-sun">☀️</span>
@@ -121,5 +124,6 @@
   nl.querySelectorAll('a').forEach(l => l.addEventListener('click', cm));
 })();
 </script>
+<script src="../assets/js/backgrounds.js"></script>
 </body>
 </html>
