@@ -1,116 +1,127 @@
-<!DOCTYPE HTML>
-<html>
-	<head>
-		<title>The EM Shift | AKG Technical Blog</title>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-		<link rel="stylesheet" href="../assets/css/main.css" />
-		<style>
-			#wrapper {
-				background: #05070a;
-				min-height: 100vh;
-				padding-top: 120px;
-			}
-			.blog-header {
-				text-align: center;
-				margin-bottom: 4rem;
-				padding: 0 2rem;
-			}
-			.blog-header h1 {
-				font-size: 3.5rem;
-				margin-bottom: 1rem;
-				color: #fff;
-			}
-			.blog-meta {
-				font-family: 'Outfit', sans-serif;
-				color: rgba(255, 255, 255, 0.5);
-				font-size: 1rem;
-				letter-spacing: 0.1em;
-				text-transform: uppercase;
-			}
-			.blog-content {
-				max-width: 900px;
-				margin: 0 auto 10rem auto;
-				padding: 4rem;
-				background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0) 100%);
-				backdrop-filter: blur(40px);
-				-webkit-backdrop-filter: blur(40px);
-				border: 1px solid rgba(255, 255, 255, 0.08);
-				border-radius: 40px;
-				box-shadow: 0 40px 100px rgba(0, 0, 0, 0.6);
-			}
-			.blog-content p {
-				font-size: 1.25rem;
-				line-height: 2;
-				margin-bottom: 2rem;
-				color: rgba(255, 255, 255, 0.85);
-			}
-			.blog-content h2 {
-				margin-top: 4rem;
-				margin-bottom: 1.5rem;
-				font-size: 2.25rem;
-				color: #fff;
-			}
-			.back-link {
-				display: inline-block;
-				margin-bottom: 3rem;
-				color: #fff;
-				text-decoration: none;
-				font-family: 'Outfit', sans-serif;
-				font-weight: 500;
-				font-size: 0.9rem;
-				letter-spacing: 0.1em;
-				text-transform: uppercase;
-				transition: opacity 0.3s;
-				border: none !important;
-			}
-			.back-link:hover {
-				opacity: 0.6;
-			}
-		</style>
-	</head>
-	<body class="is-preload">
-		<!-- Navigation -->
-		<nav id="nav">
-			<div class="nav-container">
-				<a href="../index.html" class="logo">AKG</a>
-				<ul style="display: flex; list-style: none;">
-					<li style="margin-right: 2rem;"><a href="../index.html#blog" style="color: #fff; text-decoration: none; border: none; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.1em;">All Posts</a></li>
-				</ul>
-				<a href="../Atul_Gupta_Resume.pdf" class="nav-btn" download style="padding: 0.8rem 2rem; border: 1px solid rgba(255,255,255,0.2); border-radius: 50px; color: #fff; text-decoration: none; font-size: 0.9rem; font-weight: 600;">Resume</a>
-			</div>
-		</nav>
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>The EM Shift — Atul Gupta</title>
+  <meta name="description" content="Reflections on transitioning from Staff Engineer to Engineering Manager — balancing technical debt with feature delivery." />
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="https://akgnitd.github.io/blogs/the-em-shift.html" />
+  <meta property="og:title" content="The EM Shift — Atul Gupta" />
+  <meta property="og:description" content="Reflections on transitioning from Staff Engineer to Engineering Manager — balancing technical debt with feature delivery." />
+  <meta property="og:image" content="https://akgnitd.github.io/assets/images/profile.jpg" />
 
-		<div id="wrapper">
-			<div class="blog-header">
-				<a href="../index.html#blog" class="back-link"><i class="fa fa-arrow-left"></i> Back to Home</a>
-				<div class="blog-meta">March 21, 2026 • 7 Min Read</div>
-				<h1>The EM Shift</h1>
-			</div>
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image" />
+  <meta property="twitter:url" content="https://akgnitd.github.io/blogs/the-em-shift.html" />
+  <meta property="twitter:title" content="The EM Shift — Atul Gupta" />
+  <meta property="twitter:description" content="Reflections on transitioning from Staff Engineer to Engineering Manager — balancing technical debt with feature delivery." />
+  <meta property="twitter:image" content="https://akgnitd.github.io/assets/images/profile.jpg" />
 
-			<article class="blog-content">
-				<p>Transitioning from a Staff Engineer to an Engineering Manager (EM) is one of the most significant shifts in a software career. It’s not a promotion to "Senior Engineer Plus"—it’s a completely different role that requires a new set of skills and, more importantly, a new mindset.</p>
+  <!-- Structured Data (JSON-LD) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "The EM Shift",
+    "description": "Reflections on transitioning from Staff Engineer to Engineering Manager — balancing technical debt with feature delivery.",
+    "author": {
+      "@type": "Person",
+      "name": "Atul Gupta",
+      "url": "https://akgnitd.github.io/"
+    },
+    "datePublished": "2026-03-10",
+    "image": "https://akgnitd.github.io/assets/images/profile.jpg"
+  }
+  </script>
 
-				<h2>From Fixing Code to Empowering People</h2>
-				<p>As a technical lead, your impact is measured by the quality of your architectural designs and the complexity of the bugs you resolve. As an EM, your impact is <strong>multiplied by your team’s success</strong>. The hardest part of the shift is learning to step back and resist the urge to jump into every PR. Instead, you must focus on empowering your engineers to find the right solutions themselves.</p>
+  <link rel="stylesheet" href="../assets/css/main.css" />
+</head>
+<body>
 
-				<h2>Managing Technical Debt</h2>
-				<p>In a fast-growing FinTech startup like Credit Saison, the pressure to deliver features is immense. The "EM Shift" means becoming the guardian of long-term sustainability. You have to balance the product roadmap with the health of the codebase, making the hard calls on when to refactor and when to build fast.</p>
+<nav class="navbar" id="navbar">
+  <div class="container">
+    <a href="../index.html" class="nav-logo">atul<span>.</span></a>
+    <div class="nav-links" id="navLinks">
+      <a href="../index.html#about">About</a>
+      <a href="../index.html#skills">Skills</a>
+      <a href="../index.html#projects">Projects</a>
+      <a href="../blog.html" class="active">Blog</a>
+      <a href="../index.html#contact">Contact</a>
+    </div>
+    <div class="nav-actions">
+      <!-- <a href="../resume.PDF" class="btn btn-primary" target="_blank" rel="noopener noreferrer">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Resume
+      </a> -->
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark/light mode">
+        <span class="icon-moon">🌙</span>
+        <span class="icon-sun">☀️</span>
+      </button>
+      <button class="menu-toggle" id="menuToggle" aria-label="Open menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</nav>
+<div class="mobile-overlay" id="mobileOverlay"></div>
 
-				<h2>The Psychology of Engineering Leadership</h2>
-				<p>Leadership is about empathy as much as it is about technology. Understanding what motivates individual engineers—whether it's learning a new stack like Go or taking on more architectural ownership—is key to building a high-performance culture.</p>
+<main class="blog-post-page">
+  <div class="blog-post-header">
+    <a href="../blog.html" class="back-link">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      Back to Blog
+    </a>
+    <p class="post-meta">March 10, 2026 · 5 min read</p>
+    <h1>The EM Shift</h1>
+  </div>
 
-				<p>My journey to Engineering Manager has taught me that while code is predictable, people and processes are complex. Embracing that complexity is what makes the role so rewarding.</p>
-			</article>
+  <article class="blog-post-content">
+    <p>Making the leap from Individual Contributor (IC) to Engineering Manager (EM) is one of the most challenging and rewarding transitions in a tech career. It's not a promotion — it's a <strong>career change</strong>. The skills that made you a great engineer are necessary but far from sufficient for leading a team effectively.</p>
 
-			<!-- Footer -->
-			<footer id="footer" style="padding: 4rem 0; text-align: center;">
-				<span class="copyright">&copy; akgnitd. 2026: <a href="../index.html" style="color: #fff; text-decoration: none; border-bottom: 1px dotted rgba(255,255,255,0.3);">Portfolio</a>.</span>
-			</footer>
-		</div>
+    <h2>The Mindset Shift</h2>
+    <p>As an IC, your value is measured by the code you write, the systems you design, and the problems you solve. As an EM, your value is measured by <strong>the output of your team</strong>. This requires a fundamental shift: from "how can I fix this?" to "how can I <strong>empower the team</strong> to build a sustainable solution?"</p>
+    <p>Early on, I struggled with the urge to jump into code reviews and solve every technical challenge myself. The turning point came when I realized that doing so was actually <strong>hurting</strong> the team — it created bottlenecks, reduced their ownership, and slowed their growth.</p>
 
-		<script>
-			window.onload = function() { document.body.classList.remove('is-preload'); }
-		</script>
-	</body>
+    <h2>Balancing Technical Depth</h2>
+    <p>One of the biggest fears engineers have about becoming an EM is losing technical depth. The reality is nuanced: you shift from being the <strong>deepest</strong> expert to being the <strong>broadest</strong>. You need to understand system design, make architectural trade-off decisions, and evaluate technical proposals — but you don't need to be the one writing the implementation.</p>
+    <p>I maintain my technical edge by staying close to design reviews, reading production code (not writing it), and carving out time for personal projects and technical writing. This blog is part of that practice.</p>
+
+    <h2>What Actually Matters</h2>
+    <p>The three things that have the highest leverage as an EM are: <strong>hiring well, setting clear context, and removing blockers</strong>. Everything else — process improvements, tool choices, sprint ceremonies — is in service of those three pillars.</p>
+    <p>If you hire great people, give them clear direction, and stay out of their way (while being available when they need you), the team will deliver. The challenge is having the discipline to trust the process and resist the urge to micromanage.</p>
+
+    <p>The EM role isn't for everyone, and that's okay. But for those who find joy in multiplying the impact of others, it's incredibly fulfilling.</p>
+  </article>
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-left"><p>&copy; 2026 Atul Gupta. Built with ❤️</p></div>
+    <div class="footer-links">
+      <a href="https://github.com/akgnitd" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <a href="https://linkedin.com/in/akgnitd" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+      <!-- <a href="../resume.PDF" target="_blank" rel="noopener noreferrer">Resume</a> -->
+    </div>
+  </div>
+</footer>
+
+<script>
+(function() {
+  const t = document.getElementById('themeToggle');
+  const s = localStorage.getItem('theme');
+  if (s) document.documentElement.setAttribute('data-theme', s);
+  t.addEventListener('click', () => { const n = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light'; document.documentElement.setAttribute('data-theme', n); localStorage.setItem('theme', n); });
+  const nb = document.getElementById('navbar');
+  window.addEventListener('scroll', () => nb.classList.toggle('scrolled', window.scrollY > 50), { passive: true });
+  const mt = document.getElementById('menuToggle'), nl = document.getElementById('navLinks'), ov = document.getElementById('mobileOverlay');
+  function cm() { nl.classList.remove('open'); mt.classList.remove('active'); ov.classList.remove('active'); }
+  mt.addEventListener('click', () => { const o = nl.classList.toggle('open'); mt.classList.toggle('active', o); ov.classList.toggle('active', o); });
+  ov.addEventListener('click', cm);
+  nl.querySelectorAll('a').forEach(l => l.addEventListener('click', cm));
+})();
+</script>
+</body>
 </html>

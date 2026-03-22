@@ -1,116 +1,124 @@
-<!DOCTYPE HTML>
-<html>
-	<head>
-		<title>Scaling with Golang | AKG Technical Blog</title>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-		<link rel="stylesheet" href="../assets/css/main.css" />
-		<style>
-			#wrapper {
-				background: #05070a;
-				min-height: 100vh;
-				padding-top: 120px;
-			}
-			.blog-header {
-				text-align: center;
-				margin-bottom: 4rem;
-				padding: 0 2rem;
-			}
-			.blog-header h1 {
-				font-size: 3.5rem;
-				margin-bottom: 1rem;
-				color: #fff;
-			}
-			.blog-meta {
-				font-family: 'Outfit', sans-serif;
-				color: rgba(255, 255, 255, 0.5);
-				font-size: 1rem;
-				letter-spacing: 0.1em;
-				text-transform: uppercase;
-			}
-			.blog-content {
-				max-width: 900px;
-				margin: 0 auto 10rem auto;
-				padding: 4rem;
-				background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0) 100%);
-				backdrop-filter: blur(40px);
-				-webkit-backdrop-filter: blur(40px);
-				border: 1px solid rgba(255, 255, 255, 0.08);
-				border-radius: 40px;
-				box-shadow: 0 40px 100px rgba(0, 0, 0, 0.6);
-			}
-			.blog-content p {
-				font-size: 1.25rem;
-				line-height: 2;
-				margin-bottom: 2rem;
-				color: rgba(255, 255, 255, 0.85);
-			}
-			.blog-content h2 {
-				margin-top: 4rem;
-				margin-bottom: 1.5rem;
-				font-size: 2.25rem;
-				color: #fff;
-			}
-			.back-link {
-				display: inline-block;
-				margin-bottom: 3rem;
-				color: #fff;
-				text-decoration: none;
-				font-family: 'Outfit', sans-serif;
-				font-weight: 500;
-				font-size: 0.9rem;
-				letter-spacing: 0.1em;
-				text-transform: uppercase;
-				transition: opacity 0.3s;
-				border: none !important;
-			}
-			.back-link:hover {
-				opacity: 0.6;
-			}
-		</style>
-	</head>
-	<body class="is-preload">
-		<!-- Navigation -->
-		<nav id="nav">
-			<div class="nav-container">
-				<a href="../index.html" class="logo">AKG</a>
-				<ul style="display: flex; list-style: none;">
-					<li style="margin-right: 2rem;"><a href="../index.html#blog" style="color: #fff; text-decoration: none; border: none; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.1em;">All Posts</a></li>
-				</ul>
-				<a href="../Atul_Gupta_Resume.pdf" class="nav-btn" download style="padding: 0.8rem 2rem; border: 1px solid rgba(255,255,255,0.2); border-radius: 50px; color: #fff; text-decoration: none; font-size: 0.9rem; font-weight: 600;">Resume</a>
-			</div>
-		</nav>
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Scaling with Golang — Atul Gupta</title>
+  <meta name="description" content="A deep dive into why we transitioned our mission-critical validation engines to Go, achieving 40% reduction in P99 latency." />
+  
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="https://akgnitd.github.io/blogs/scaling-with-golang.html" />
+  <meta property="og:title" content="Scaling with Golang — Atul Gupta" />
+  <meta property="og:description" content="A deep dive into why we transitioned our mission-critical validation engines to Go, achieving 40% reduction in P99 latency." />
+  <meta property="og:image" content="https://akgnitd.github.io/assets/images/profile.jpg" />
 
-		<div id="wrapper">
-			<div class="blog-header">
-				<a href="../index.html#blog" class="back-link"><i class="fa fa-arrow-left"></i> Back to Home</a>
-				<div class="blog-meta">March 21, 2026 • 6 Min Read</div>
-				<h1>Scaling with Golang</h1>
-			</div>
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image" />
+  <meta property="twitter:url" content="https://akgnitd.github.io/blogs/scaling-with-golang.html" />
+  <meta property="twitter:title" content="Scaling with Golang — Atul Gupta" />
+  <meta property="twitter:description" content="A deep dive into why we transitioned our mission-critical validation engines to Go, achieving 40% reduction in P99 latency." />
+  <meta property="twitter:image" content="https://akgnitd.github.io/assets/images/profile.jpg" />
 
-			<article class="blog-content">
-				<p>In the fast-paced world of FinTech, performance isn't just a metric—it's a requirement. At Credit Saison, we faced a significant challenge: our core validation engines were struggling to handle the increasing volume of real-time transactions with the low latency our users expect. After extensive benchmarking, we made the strategic decision to transition mission-critical services to <strong>Golang</strong>.</p>
+  <!-- Structured Data (JSON-LD) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "Scaling with Golang",
+    "description": "A deep dive into why we transitioned our mission-critical validation engines to Go, achieving 40% reduction in P99 latency.",
+    "author": {
+      "@type": "Person",
+      "name": "Atul Gupta",
+      "url": "https://akgnitd.github.io/"
+    },
+    "datePublished": "2026-03-21",
+    "image": "https://akgnitd.github.io/assets/images/profile.jpg"
+  }
+  </script>
 
-				<h2>Why Golang?</h2>
-				<p>Java has been our backbone for years, but the overhead of JVM and the complexity of managing thread pools at extreme scales became a bottleneck. Go's lightweight <strong>Goroutines</strong> allowed us to handle thousands of concurrent requests using minimal memory compared to traditional thread-based models.</p>
+  <link rel="stylesheet" href="../assets/css/main.css" />
+</head>
+<body>
 
-				<h2>The Performance Gains</h2>
-				<p>The results were immediate. We observed a <strong>40% reduction in P99 latency</strong>. More importantly, our infrastructure costs dropped as we could process the same number of requests with fewer CPU and RAM resources. The simplicity of Go's concurrency model also reduced the bugs associated with complex multi-threaded Java applications.</p>
+<nav class="navbar" id="navbar">
+  <div class="container">
+    <a href="../index.html" class="nav-logo">atul<span>.</span></a>
+    <div class="nav-links" id="navLinks">
+      <a href="../index.html#about">About</a>
+      <a href="../index.html#skills">Skills</a>
+      <a href="../index.html#projects">Projects</a>
+      <a href="../blog.html" class="active">Blog</a>
+      <a href="../index.html#contact">Contact</a>
+    </div>
+    <div class="nav-actions">
+      <!-- <a href="../resume.PDF" class="btn btn-primary" target="_blank" rel="noopener noreferrer">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Resume
+      </a> -->
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark/light mode">
+        <span class="icon-moon">🌙</span>
+        <span class="icon-sun">☀️</span>
+      </button>
+      <button class="menu-toggle" id="menuToggle" aria-label="Open menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</nav>
+<div class="mobile-overlay" id="mobileOverlay"></div>
 
-				<h2>Lessons Learned</h2>
-				<p>Transitioning a team isn't just about syntax; it's about mindset. Moving from an OOP-heavy Spring Boot environment to Go's composition-based approach required a cultural shift. We focused on clear documentation and peer reviews to ensure our "Go-idiomatic" code remained maintainable and scalable.</p>
+<main class="blog-post-page">
+  <div class="blog-post-header">
+    <a href="../blog.html" class="back-link">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      Back to Blog
+    </a>
+    <p class="post-meta">March 21, 2026 · 6 min read</p>
+    <h1>Scaling with Golang</h1>
+  </div>
 
-				<p>Today, Go powers our most critical validation layers, enabling us to deliver lightning-fast financial decisions for millions of users.</p>
-			</article>
+  <article class="blog-post-content">
+    <p>In the fast-paced world of FinTech, performance isn't just a metric — it's a requirement. At Credit Saison, we faced a significant challenge: our core validation engines were struggling to handle the increasing volume of real-time transactions with the low latency our users expect. After extensive benchmarking, we made the strategic decision to transition mission-critical services to <strong>Golang</strong>.</p>
 
-			<!-- Footer -->
-			<footer id="footer" style="padding: 4rem 0; text-align: center;">
-				<span class="copyright">&copy; akgnitd. 2026: <a href="../index.html" style="color: #fff; text-decoration: none; border-bottom: 1px dotted rgba(255,255,255,0.3);">Portfolio</a>.</span>
-			</footer>
-		</div>
+    <h2>Why Golang?</h2>
+    <p>Java has been our backbone for years, but the overhead of JVM and the complexity of managing thread pools at extreme scales became a bottleneck. Go's lightweight <strong>Goroutines</strong> allowed us to handle thousands of concurrent requests using minimal memory compared to traditional thread-based models.</p>
 
-		<script>
-			window.onload = function() { document.body.classList.remove('is-preload'); }
-		</script>
-	</body>
+    <h2>The Performance Gains</h2>
+    <p>The results were immediate. We observed a <strong>40% reduction in P99 latency</strong>. More importantly, our infrastructure costs dropped as we could process the same number of requests with fewer CPU and RAM resources. The simplicity of Go's concurrency model also reduced the bugs associated with complex multi-threaded Java applications.</p>
+
+    <h2>Lessons Learned</h2>
+    <p>Transitioning a team isn't just about syntax; it's about mindset. Moving from an OOP-heavy Spring Boot environment to Go's composition-based approach required a cultural shift. We focused on clear documentation and peer reviews to ensure our "Go-idiomatic" code remained maintainable and scalable.</p>
+
+    <p>Today, Go powers our most critical validation layers, enabling us to deliver lightning-fast financial decisions for millions of users.</p>
+  </article>
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-left"><p>&copy; 2026 Atul Gupta. Built with ❤️</p></div>
+    <div class="footer-links">
+      <a href="https://github.com/akgnitd" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <a href="https://linkedin.com/in/akgnitd" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+      <!-- <a href="../resume.PDF" target="_blank" rel="noopener noreferrer">Resume</a> -->
+    </div>
+  </div>
+</footer>
+
+<script>
+(function() {
+  const t = document.getElementById('themeToggle');
+  const s = localStorage.getItem('theme');
+  if (s) document.documentElement.setAttribute('data-theme', s);
+  t.addEventListener('click', () => { const n = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light'; document.documentElement.setAttribute('data-theme', n); localStorage.setItem('theme', n); });
+  const nb = document.getElementById('navbar');
+  window.addEventListener('scroll', () => nb.classList.toggle('scrolled', window.scrollY > 50), { passive: true });
+  const mt = document.getElementById('menuToggle'), nl = document.getElementById('navLinks'), ov = document.getElementById('mobileOverlay');
+  function cm() { nl.classList.remove('open'); mt.classList.remove('active'); ov.classList.remove('active'); }
+  mt.addEventListener('click', () => { const o = nl.classList.toggle('open'); mt.classList.toggle('active', o); ov.classList.toggle('active', o); });
+  ov.addEventListener('click', cm);
+  nl.querySelectorAll('a').forEach(l => l.addEventListener('click', cm));
+})();
+</script>
+</body>
 </html>
