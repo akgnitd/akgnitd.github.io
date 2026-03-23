@@ -4,7 +4,7 @@ const ctx = canvas.getContext("2d");
 let w, h;
 let animationFrameId;
 let currentMode = parseInt(localStorage.getItem('bgMode') || '0');
-const modes = ['Nodes', 'Stars', 'Aurora', 'Bokeh', 'Smoke', 'Nexus', 'Glow', 'Off'];
+const modes = ['Nodes', 'Stars', 'Aurora', 'Off'];
 
 let activeAnimation = null;
 let mouse = { x: -1000, y: -1000 };
@@ -91,89 +91,7 @@ class AuroraAnimation {
     }
 }
 
-// --- 4. Bokeh (Cinematic Circles) ---
-class BokehAnimation {
-    constructor() {
-        this.parts = [];
-        for(let i=0; i<20; i++) this.parts.push({x:Math.random()*w, y:Math.random()*h, r:randomRange(30,120), vx:randomRange(-0.5,0.5), vy:randomRange(-0.5,0.5), h:randomRange(240,300)});
-    }
-    updateAndDraw(isLight) {
-        ctx.globalCompositeOperation = 'lighter';
-        for(let p of this.parts) {
-            p.x+=p.vx; p.y+=p.vy;
-            if(p.x<-p.r || p.x>w+p.r) p.vx*=-1;
-            if(p.y<-p.r || p.y>h+p.r) p.vy*=-1;
-            ctx.fillStyle = `hsla(${p.h}, 70%, ${isLight?'40%':'60%'}, 0.1)`;
-            ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2); ctx.fill();
-        }
-        ctx.globalCompositeOperation = 'source-over';
-    }
-}
 
-// --- 5. Volumetric Smoke ---
-class SmokeAnimation {
-    constructor() {
-        this.p = [];
-        for(let i=0; i<30; i++) this.p.push({x:Math.random()*w, y:h+100, vx:randomRange(-0.5,0.5), vy:randomRange(-2,-0.5), s:randomRange(100,300), a:randomRange(0.01,0.04)});
-    }
-    updateAndDraw(isLight) {
-        ctx.fillStyle = isLight ? "#6366f1" : "#fff";
-        for(let p of this.p) {
-            p.x+=p.vx; p.y+=p.vy; p.s+=0.1;
-            if(p.y < -p.s) { p.y=h+p.s; p.x=Math.random()*w; p.s=randomRange(100,300); }
-            ctx.globalAlpha = p.a; ctx.filter = `blur(${p.s/3}px)`;
-            ctx.beginPath(); ctx.arc(p.x,p.y,p.s,0,Math.PI*2); ctx.fill();
-        }
-        ctx.filter = 'none'; ctx.globalAlpha = 1;
-    }
-}
-
-// --- 6. Nexus (Interactive Web) ---
-class NexusAnimation {
-    constructor() {
-        this.p = [];
-        for(let i=0; i<40; i++) this.p.push({x:Math.random()*w, y:Math.random()*h, r:randomRange(200,400), a:Math.random()*Math.PI*2, s:randomRange(0.001,0.005)});
-    }
-    updateAndDraw(isLight) {
-        ctx.strokeStyle = isLight ? "rgba(99, 102, 241, 0.15)" : "rgba(255, 255, 255, 0.15)";
-        ctx.lineWidth = 1;
-        const cx = w/2, cy = h/2;
-        for(let i=0; i<this.p.length; i++) {
-            let p = this.p[i]; p.a += p.s;
-            let x = cx + Math.cos(p.a) * p.r;
-            let y = cy + Math.sin(p.a) * p.r;
-            for(let j=i+1; j<this.p.length; j++) {
-                let p2 = this.p[j];
-                let x2 = cx + Math.cos(p2.a) * p2.r;
-                let y2 = cy + Math.sin(p2.a) * p2.r;
-                if(Math.sqrt(Math.pow(x-x2,2)+Math.pow(y-y2,2)) < 250) {
-                    ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x2,y2); ctx.stroke();
-                }
-            }
-        }
-    }
-}
-
-// --- 7. Glow (Soft Ambient Pulses) ---
-class GlowAnimation {
-    constructor() {
-        this.l = [];
-        for(let i=0; i<15; i++) this.l.push({x:Math.random()*w, y:Math.random()*h, r:randomRange(50,150), v:randomRange(0.2,0.8), a:Math.random()*Math.PI*2});
-    }
-    updateAndDraw(isLight) {
-        ctx.globalCompositeOperation = 'screen';
-        const rgb = isLight ? "99, 102, 241" : "168, 85, 247";
-        for(let l of this.l) {
-            l.a += 0.01;
-            let dx = Math.cos(l.a) * l.v; let dy = Math.sin(l.a) * l.v;
-            l.x+=dx; l.y+=dy;
-            let g = ctx.createRadialGradient(l.x,l.y,0,l.x,l.y,l.r);
-            g.addColorStop(0, `rgba(${rgb}, 0.3)`); g.addColorStop(1, 'transparent');
-            ctx.fillStyle = g; ctx.beginPath(); ctx.arc(l.x,l.y,l.r,0,Math.PI*2); ctx.fill();
-        }
-        ctx.globalCompositeOperation = 'source-over';
-    }
-}
 
 function switchMode(newMode) {
   currentMode = (newMode + modes.length) % modes.length;
@@ -181,10 +99,6 @@ function switchMode(newMode) {
   if (currentMode === 0) activeAnimation = new NodesAnimation();
   else if (currentMode === 1) activeAnimation = new StarsAnimation();
   else if (currentMode === 2) activeAnimation = new AuroraAnimation();
-  else if (currentMode === 3) activeAnimation = new BokehAnimation();
-  else if (currentMode === 4) activeAnimation = new SmokeAnimation();
-  else if (currentMode === 5) activeAnimation = new NexusAnimation();
-  else if (currentMode === 6) activeAnimation = new GlowAnimation();
   else activeAnimation = null;
   const btn = document.getElementById("bgSwitcher");
   if(btn) btn.innerHTML = `🌍 Bg: ${modes[currentMode]}`;

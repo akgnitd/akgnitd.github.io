@@ -553,6 +553,7 @@
         entries.forEach(entry => {
           if (entry.isIntersecting) {
             entry.target.classList.add('visible');
+            observer.unobserve(entry.target);
           }
         });
       }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
@@ -563,15 +564,33 @@
       const sections = document.querySelectorAll('section[id]');
       const navAnchors = document.querySelectorAll('.nav-links a[href^="#"]');
 
+      let sectionTops = [];
+      function calcSectionTops() {
+        sectionTops = Array.from(sections).map(sec => ({
+          id: sec.getAttribute('id'),
+          top: sec.offsetTop - 120
+        }));
+      }
+      window.addEventListener('resize', calcSectionTops, { passive: true });
+      // Minor delay to ensure fonts/layout are loaded before calculating
+      setTimeout(calcSectionTops, 100);
+
+      let scrollTickingNav = false;
       window.addEventListener('scroll', () => {
-        let current = '';
-        sections.forEach(section => {
-          const top = section.offsetTop - 120;
-          if (window.scrollY >= top) current = section.getAttribute('id');
-        });
-        navAnchors.forEach(a => {
-          a.classList.toggle('active', a.getAttribute('href') === '#' + current);
-        });
+        if (!scrollTickingNav) {
+          window.requestAnimationFrame(() => {
+            let current = '';
+            const scrollY = window.scrollY;
+            sectionTops.forEach(sec => {
+              if (scrollY >= sec.top) current = sec.id;
+            });
+            navAnchors.forEach(a => {
+              a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+            });
+            scrollTickingNav = false;
+          });
+          scrollTickingNav = true;
+        }
       }, { passive: true });
 
       // ---- Blog Cards (inline data to avoid CORS on file:// protocol) ----

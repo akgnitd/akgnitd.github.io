@@ -44,7 +44,7 @@
 
   /* Glass */
   --glass-bg: rgba(255, 255, 255, 0.03);
-  --glass-blur: 20px;
+  --glass-blur: 8px;
   --glass-border: 1px solid var(--color-border);
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
@@ -67,7 +67,7 @@
   --accent-glow: rgba(79, 70, 229, 0.15);
 
   --glass-bg: rgba(255, 255, 255, 0.6);
-  --glass-blur: 20px;
+  --glass-blur: 8px;
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
 }
 
@@ -153,6 +153,7 @@ h1, h2, h3, h4, h5, h6 {
   opacity: 0;
   transform: translateY(40px);
   transition: opacity 0.8s var(--ease-out), transform 0.8s var(--ease-out);
+  will-change: opacity, transform;
 }
 
 .reveal.visible {
@@ -183,6 +184,8 @@ h1, h2, h3, h4, h5, h6 {
   -webkit-backdrop-filter: blur(var(--glass-blur));
   border-bottom: var(--glass-border);
   padding: 0.75rem 0;
+  transform: translateZ(0);
+  will-change: transform, background-color;
 }
 
 .navbar .container {
@@ -512,6 +515,7 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: var(--glass-shadow);
   position: relative;
   overflow: hidden;
+  transform: translateZ(0);
 }
 
 .about-card::before {
@@ -562,6 +566,7 @@ h1, h2, h3, h4, h5, h6 {
   transition: all var(--transition-medium);
   position: relative;
   overflow: hidden;
+  transform: translateZ(0);
 }
 
 .skill-card::before {
@@ -577,7 +582,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .skill-card:hover {
-  transform: translateY(-6px);
+  transform: translateY(-6px) translateZ(0);
   border-color: var(--color-border-hover);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
 }
@@ -642,6 +647,7 @@ h1, h2, h3, h4, h5, h6 {
   transition: all var(--transition-medium);
   position: relative;
   overflow: hidden;
+  transform: translateZ(0);
 }
 
 .project-card::before {
@@ -658,7 +664,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .project-card:hover {
-  transform: translateY(-6px);
+  transform: translateY(-6px) translateZ(0);
   border-color: var(--color-border-hover);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
 }
@@ -798,11 +804,12 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: var(--card-radius);
   padding: 1.5rem 2rem;
   transition: all var(--transition-medium);
+  transform: translateZ(0);
 }
 
 .timeline-card:hover {
   border-color: var(--color-border-hover);
-  transform: translateX(6px);
+  transform: translateX(6px) translateZ(0);
 }
 
 .timeline-card h3 {
@@ -847,10 +854,11 @@ h1, h2, h3, h4, h5, h6 {
   flex-direction: column;
   transition: all var(--transition-medium);
   text-decoration: none;
+  transform: translateZ(0);
 }
 
 .blog-card:hover {
-  transform: translateY(-6px);
+  transform: translateY(-6px) translateZ(0);
   border-color: var(--color-border-hover);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.2);
 }
@@ -939,6 +947,7 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: var(--glass-shadow);
   position: relative;
   overflow: hidden;
+  transform: translateZ(0);
 }
 
 .contact-card::before {
