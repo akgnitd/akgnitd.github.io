@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Designing a High-Throughput Validation Engine — Atul Gupta</title>
+  <meta name="description" content="A system design deep-dive into building a JSON Schema validation engine that processes millions of financial documents with sub-50ms latency." />
+
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="https://akgnitd.github.io/blogs/validation-engine-design.html" />
+  <meta property="og:title" content="Designing a High-Throughput Validation Engine — Atul Gupta" />
+  <meta property="og:description" content="A system design deep-dive into building a JSON Schema validation engine that processes millions of financial documents with sub-50ms latency." />
+  <meta property="og:image" content="https://akgnitd.github.io/assets/images/profile.jpg" />
+
+  <meta property="twitter:card" content="summary_large_image" />
+  <meta property="twitter:url" content="https://akgnitd.github.io/blogs/validation-engine-design.html" />
+  <meta property="twitter:title" content="Designing a High-Throughput Validation Engine — Atul Gupta" />
+  <meta property="twitter:description" content="A system design deep-dive into building a JSON Schema validation engine that processes millions of financial documents with sub-50ms latency." />
+  <meta property="twitter:image" content="https://akgnitd.github.io/assets/images/profile.jpg" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "Designing a High-Throughput Validation Engine",
+    "description": "A system design deep-dive into building a JSON Schema validation engine that processes millions of financial documents with sub-50ms latency.",
+    "author": {
+      "@type": "Person",
+      "name": "Atul Gupta",
+      "url": "https://akgnitd.github.io/"
+    },
+    "datePublished": "2026-03-05",
+    "image": "https://akgnitd.github.io/assets/images/profile.jpg"
+  }
+  </script>
+
+  <meta name="theme-color" content="#05070a" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)" />
+  <link rel="icon" type="image/svg+xml" href="../assets/images/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="../assets/css/main.css" />
+</head>
+<body>
+
+<a href="#main" class="skip-to-content">Skip to main content</a>
+<div class="reading-progress" id="readingProgress"></div>
+<canvas id="bg-canvas" class="bg-canvas"></canvas>
+
+<nav class="navbar" id="navbar">
+  <div class="container">
+    <a href="../index.html" class="nav-logo">atul<span>.</span></a>
+    <div class="nav-links" id="navLinks">
+      <a href="../index.html#about">About</a>
+      <a href="../index.html#skills">Skills</a>
+      <a href="../index.html#projects">Projects</a>
+      <a href="../blog.html" class="active">Blog</a>
+      <a href="../index.html#contact">Contact</a>
+    </div>
+    <div class="nav-actions">
+      <button id="bgSwitcher" class="btn" style="padding: 0.5rem 0.9rem; margin-right: 0.5rem;" onclick="window.toggleBackgroundMode && window.toggleBackgroundMode()" title="Cycle Background Animation">🌍</button>
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark/light mode">
+        <span class="icon-moon">🌙</span>
+        <span class="icon-sun">☀️</span>
+      </button>
+      <button class="menu-toggle" id="menuToggle" aria-label="Open menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</nav>
+<div class="mobile-overlay" id="mobileOverlay"></div>
+
+<main id="main" class="blog-post-page">
+  <div class="blog-post-header">
+    <a href="../blog.html" class="back-link">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      Back to Blog
+    </a>
+    <p class="post-meta">March 5, 2026 · 7 min read</p>
+    <h1>Designing a High-Throughput Validation Engine</h1>
+  </div>
+
+  <article class="blog-post-content">
+    <p>In FinTech, every loan application, every KYC document, and every transaction payload must pass through a gauntlet of validation rules before it can proceed. At Credit Saison, we needed a validation engine that could handle <strong>millions of documents daily</strong> with sub-50ms latency and near-zero error rates. This is the story of how we designed it.</p>
+
+    <h2>The Problem Space</h2>
+    <p>Our initial validation layer was a monolithic Spring Boot service with hardcoded rules scattered across dozens of service classes. Adding a new validation rule meant a code change, a PR, a deployment. Worse, the rules weren't composable — each product team maintained their own validation logic, leading to <strong>drift, duplication, and inconsistency</strong>.</p>
+    <p>We needed a system that was: <strong>declarative</strong> (rules as configuration, not code), <strong>extensible</strong> (custom keywords for domain logic), <strong>fast</strong> (sub-50ms P95 for complex schemas), and <strong>observable</strong> (clear error paths for every validation failure).</p>
+
+    <h2>Architecture Decisions</h2>
+    <p>We chose <strong>JSON Schema</strong> as our validation language. It's a well-defined standard, has excellent tooling, and — crucially — it separates the "what" (the schema) from the "how" (the engine). This let product teams define their own schemas without touching engine code.</p>
+    <p>The engine itself is built on <strong>NetworkNT's json-schema-validator</strong>, which we extended heavily. We added custom keywords for Indian financial domain logic: PAN validation, Aadhaar checksum verification, IFSC code format checking, and cross-field conditional rules (e.g., "if employment type is salaried, salary slip is mandatory").</p>
+
+    <h2>Performance Engineering</h2>
+    <p>The naive approach — compile schema, validate document, return — added 15-30ms of overhead per request just for schema compilation. Our key insight: <strong>schemas change rarely but documents flow constantly</strong>. We introduced a schema compilation cache with versioned invalidation. Compiled schemas are held in memory and only recompiled when the schema version changes.</p>
+    <p>This single optimization dropped our P95 from 45ms to <strong>8ms</strong> for cached schemas. For cold starts, we added a warm-up routine that pre-compiles the 50 most-used schemas at service startup.</p>
+    <p>For the Go rewrite of the hot path, we leveraged goroutines to validate independent sub-schemas concurrently. A loan application with 12 document types can have all 12 validated in parallel, with results merged at the end. This brought our P99 down by another 40%.</p>
+
+    <h2>Error Reporting</h2>
+    <p>A validation engine is only as good as its error messages. Generic "validation failed" responses are useless to frontend teams and operations staff. We built a custom error formatter that translates JSON Schema validation paths into <strong>human-readable, localizable error messages</strong>. Each error carries a unique code, the field path, the expected value, and the actual value.</p>
+
+    <h2>Lessons Learned</h2>
+    <p>Three key takeaways from this project:</p>
+    <p><strong>1. Invest in schema tooling early.</strong> We built a schema editor UI, a test harness for running documents against schemas, and a diff tool for comparing schema versions. These tools paid for themselves within weeks.</p>
+    <p><strong>2. Measure everything.</strong> We instrument every validation with latency histograms, error rate counters, and schema hit/miss ratios. When a new schema causes a latency spike, we know within minutes.</p>
+    <p><strong>3. Design for the next 10x.</strong> Our original design supported 100K validations/day. Today we process 2M+ daily. The schema-as-configuration approach meant scaling required zero code changes — just more compute.</p>
+
+    <p>The validation engine is now one of the most stable and highest-throughput services in our platform, processing every financial decision with confidence.</p>
+  </article>
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-left"><p>&copy; 2026 Atul Gupta.</p></div>
+    <div class="footer-links">
+      <a href="https://github.com/akgnitd" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <a href="https://linkedin.com/in/akgnitd" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../assets/js/main.js"></script>
+<script src="../assets/js/backgrounds.js"></script>
+</body>
+</html>

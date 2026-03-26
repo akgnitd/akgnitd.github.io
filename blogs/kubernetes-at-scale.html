@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kubernetes at Scale: Lessons from Production — Atul Gupta</title>
+  <meta name="description" content="Hard-won lessons from running 50+ microservices on Kubernetes in production — from resource tuning to zero-downtime deployments." />
+
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="https://akgnitd.github.io/blogs/kubernetes-at-scale.html" />
+  <meta property="og:title" content="Kubernetes at Scale: Lessons from Production — Atul Gupta" />
+  <meta property="og:description" content="Hard-won lessons from running 50+ microservices on Kubernetes in production — from resource tuning to zero-downtime deployments." />
+  <meta property="og:image" content="https://akgnitd.github.io/assets/images/profile.jpg" />
+
+  <meta property="twitter:card" content="summary_large_image" />
+  <meta property="twitter:url" content="https://akgnitd.github.io/blogs/kubernetes-at-scale.html" />
+  <meta property="twitter:title" content="Kubernetes at Scale: Lessons from Production — Atul Gupta" />
+  <meta property="twitter:description" content="Hard-won lessons from running 50+ microservices on Kubernetes in production — from resource tuning to zero-downtime deployments." />
+  <meta property="twitter:image" content="https://akgnitd.github.io/assets/images/profile.jpg" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "Kubernetes at Scale: Lessons from Production",
+    "description": "Hard-won lessons from running 50+ microservices on Kubernetes in production — from resource tuning to zero-downtime deployments.",
+    "author": {
+      "@type": "Person",
+      "name": "Atul Gupta",
+      "url": "https://akgnitd.github.io/"
+    },
+    "datePublished": "2026-02-28",
+    "image": "https://akgnitd.github.io/assets/images/profile.jpg"
+  }
+  </script>
+
+  <meta name="theme-color" content="#05070a" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)" />
+  <link rel="icon" type="image/svg+xml" href="../assets/images/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="../assets/css/main.css" />
+</head>
+<body>
+
+<a href="#main" class="skip-to-content">Skip to main content</a>
+<div class="reading-progress" id="readingProgress"></div>
+<canvas id="bg-canvas" class="bg-canvas"></canvas>
+
+<nav class="navbar" id="navbar">
+  <div class="container">
+    <a href="../index.html" class="nav-logo">atul<span>.</span></a>
+    <div class="nav-links" id="navLinks">
+      <a href="../index.html#about">About</a>
+      <a href="../index.html#skills">Skills</a>
+      <a href="../index.html#projects">Projects</a>
+      <a href="../blog.html" class="active">Blog</a>
+      <a href="../index.html#contact">Contact</a>
+    </div>
+    <div class="nav-actions">
+      <button id="bgSwitcher" class="btn" style="padding: 0.5rem 0.9rem; margin-right: 0.5rem;" onclick="window.toggleBackgroundMode && window.toggleBackgroundMode()" title="Cycle Background Animation">🌍</button>
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark/light mode">
+        <span class="icon-moon">🌙</span>
+        <span class="icon-sun">☀️</span>
+      </button>
+      <button class="menu-toggle" id="menuToggle" aria-label="Open menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</nav>
+<div class="mobile-overlay" id="mobileOverlay"></div>
+
+<main id="main" class="blog-post-page">
+  <div class="blog-post-header">
+    <a href="../blog.html" class="back-link">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      Back to Blog
+    </a>
+    <p class="post-meta">February 28, 2026 · 6 min read</p>
+    <h1>Kubernetes at Scale: Lessons from Production</h1>
+  </div>
+
+  <article class="blog-post-content">
+    <p>Moving from "Kubernetes works on my cluster" to "Kubernetes reliably runs our business" is a journey filled with surprises. Over the past two years, we've scaled from a handful of services on ECS to <strong>50+ microservices on EKS</strong>. Here are the lessons that cost us the most to learn.</p>
+
+    <h2>Resource Requests Are Not Optional</h2>
+    <p>Our first production incident on Kubernetes was caused by a service with no resource requests. It got scheduled onto a node that was already at 90% memory, triggered OOM kills on neighbouring pods, and cascaded into a partial outage. The fix was simple but the lesson was expensive: <strong>every pod must have resource requests and limits</strong>. No exceptions.</p>
+    <p>We now enforce this via OPA/Gatekeeper policies. Any deployment without resource definitions is rejected at admission. We also run <strong>Vertical Pod Autoscaler (VPA)</strong> in recommendation mode to help teams right-size their requests based on actual usage rather than guesswork.</p>
+
+    <h2>Readiness Probes Save Lives</h2>
+    <p>A readiness probe isn't just a health check — it's the contract between your application and the cluster. We had a Java service that took 45 seconds to warm up its connection pools. Without a readiness probe, Kubernetes would route traffic to it immediately after the container started, causing a wave of 503 errors on every deployment.</p>
+    <p>Our standard now: every service must have a <strong>readiness probe</strong> that checks actual dependency connectivity (database, cache, message broker), not just "is the HTTP server up." Liveness probes are simpler — they check if the process is responsive, not if dependencies are healthy.</p>
+
+    <h2>Zero-Downtime Deployments</h2>
+    <p>Rolling updates in Kubernetes look simple on paper: <code>maxSurge: 1, maxUnavailable: 0</code>. In practice, we hit a subtle issue: the old pod would receive a SIGTERM, start shutting down, but the Kubernetes service endpoint list hadn't been updated yet. For a brief window, traffic was still being routed to a pod that was draining connections.</p>
+    <p>The solution was a <strong>preStop lifecycle hook</strong> with a 5-second sleep, giving the endpoint controller time to remove the pod from the service before it starts shutting down. Combined with graceful shutdown in our application code, we achieved true zero-downtime deployments.</p>
+
+    <h2>Observability Is Non-Negotiable</h2>
+    <p>Kubernetes adds a layer of indirection between your application and the infrastructure. When something goes wrong, you need to answer: is it the app, the pod, the node, or the cluster? We invested heavily in a three-pillar observability stack:</p>
+    <p><strong>Metrics:</strong> Prometheus + Grafana with standardized dashboards per service. Every team gets a "golden signals" dashboard (latency, traffic, errors, saturation) out of the box.</p>
+    <p><strong>Logs:</strong> Fluent Bit shipping to ElasticSearch with structured JSON logging. Correlation IDs propagated across services for request tracing.</p>
+    <p><strong>Traces:</strong> OpenTelemetry with Jaeger for distributed tracing. This was the single most impactful investment for debugging cross-service latency issues.</p>
+
+    <h2>Cost Optimization</h2>
+    <p>Kubernetes makes it easy to <em>spend</em> money but hard to <em>track</em> it. We implemented namespace-level resource quotas, Kubecost for per-team cost attribution, and <strong>Karpenter</strong> for intelligent node provisioning. The biggest win was switching from on-demand to a mix of reserved instances and spot for non-critical workloads — a 40% reduction in compute costs.</p>
+
+    <h2>What I'd Do Differently</h2>
+    <p>If I were starting over: <strong>invest in a platform team from day one</strong>. We tried to let each team manage their own Kubernetes manifests and Helm charts. The result was 50 slightly different ways to deploy a service. A dedicated platform team that provides golden paths — standardized Helm charts, CI/CD templates, and self-service tooling — would have saved months of duplicated effort.</p>
+
+    <p>Kubernetes is a powerful platform, but it's not magic. The real work is in the operational practices you build around it.</p>
+  </article>
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-left"><p>&copy; 2026 Atul Gupta.</p></div>
+    <div class="footer-links">
+      <a href="https://github.com/akgnitd" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <a href="https://linkedin.com/in/akgnitd" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../assets/js/main.js"></script>
+<script src="../assets/js/backgrounds.js"></script>
+</body>
+</html>

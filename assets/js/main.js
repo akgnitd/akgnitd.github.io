@@ -4,35 +4,47 @@
   /* ==========================================================
      Shared Site Logic
      Theme toggle, navigation, mobile menu, scroll reveal,
-     active-section highlighting, and blog card rendering.
+     typewriter, reading progress, and blog card rendering.
      ========================================================== */
 
+  var reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
   // ---- Theme Toggle ----
-  const themeToggle = document.getElementById('themeToggle');
-  const savedTheme = localStorage.getItem('theme');
+  var themeToggle = document.getElementById('themeToggle');
+  var savedTheme = localStorage.getItem('theme');
   if (savedTheme) document.documentElement.setAttribute('data-theme', savedTheme);
 
   if (themeToggle) {
-    themeToggle.addEventListener('click', () => {
-      const current = document.documentElement.getAttribute('data-theme');
-      const next = current === 'light' ? 'dark' : 'light';
+    themeToggle.addEventListener('click', function () {
+      var current = document.documentElement.getAttribute('data-theme');
+      var next = current === 'light' ? 'dark' : 'light';
       document.documentElement.setAttribute('data-theme', next);
       localStorage.setItem('theme', next);
+
+      // Canvas crossfade on theme switch
+      var canvas = document.getElementById('bg-canvas');
+      if (canvas && !reducedMotion) {
+        canvas.style.transition = 'opacity 0.3s ease';
+        canvas.style.opacity = '0';
+        setTimeout(function () {
+          canvas.style.opacity = '1';
+        }, 300);
+      }
     });
   }
 
   // ---- Navbar Scroll Effect ----
-  const navbar = document.getElementById('navbar');
+  var navbar = document.getElementById('navbar');
   if (navbar) {
-    window.addEventListener('scroll', () => {
+    window.addEventListener('scroll', function () {
       navbar.classList.toggle('scrolled', window.scrollY > 50);
     }, { passive: true });
   }
 
   // ---- Mobile Menu ----
-  const menuToggle = document.getElementById('menuToggle');
-  const navLinks = document.getElementById('navLinks');
-  const overlay = document.getElementById('mobileOverlay');
+  var menuToggle = document.getElementById('menuToggle');
+  var navLinks = document.getElementById('navLinks');
+  var overlay = document.getElementById('mobileOverlay');
 
   function closeMenu() {
     if (navLinks) navLinks.classList.remove('open');
@@ -41,8 +53,8 @@
   }
 
   if (menuToggle && navLinks) {
-    menuToggle.addEventListener('click', () => {
-      const isOpen = navLinks.classList.toggle('open');
+    menuToggle.addEventListener('click', function () {
+      var isOpen = navLinks.classList.toggle('open');
       menuToggle.classList.toggle('active', isOpen);
       if (overlay) overlay.classList.toggle('active', isOpen);
     });
@@ -56,7 +68,7 @@
   }
 
   // ---- Scroll Reveal (IntersectionObserver) ----
-  const observer = new IntersectionObserver(function (entries) {
+  var observer = new IntersectionObserver(function (entries) {
     entries.forEach(function (entry) {
       if (entry.isIntersecting) {
         entry.target.classList.add('visible');
@@ -65,13 +77,72 @@
     });
   }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
 
-  document.querySelectorAll('.reveal').forEach(function (el) {
-    observer.observe(el);
-  });
+  // If reduced motion, show everything immediately
+  if (reducedMotion) {
+    document.querySelectorAll('.reveal').forEach(function (el) {
+      el.classList.add('visible');
+    });
+  } else {
+    document.querySelectorAll('.reveal').forEach(function (el) {
+      observer.observe(el);
+    });
+  }
+
+  // ---- Typewriter Effect (hero section) ----
+  var typewriterEl = document.getElementById('typewriter');
+  if (typewriterEl && !reducedMotion) {
+    var roles = ['Builder & Techie', 'System Architect', 'Engineering Leader', 'Open Source Lover'];
+    var roleIndex = 0;
+    var charIndex = 0;
+    var isDeleting = false;
+    var typeSpeed = 80;
+    var pauseDuration = 2000;
+
+    function typewrite() {
+      var current = roles[roleIndex];
+      if (isDeleting) {
+        typewriterEl.textContent = current.substring(0, charIndex - 1);
+        charIndex--;
+      } else {
+        typewriterEl.textContent = current.substring(0, charIndex + 1);
+        charIndex++;
+      }
+
+      var delay = typeSpeed;
+
+      if (!isDeleting && charIndex === current.length) {
+        delay = pauseDuration;
+        isDeleting = true;
+      } else if (isDeleting && charIndex === 0) {
+        isDeleting = false;
+        roleIndex = (roleIndex + 1) % roles.length;
+        delay = 400;
+      } else if (isDeleting) {
+        delay = 40;
+      }
+
+      setTimeout(typewrite, delay);
+    }
+
+    typewrite();
+  } else if (typewriterEl) {
+    typewriterEl.textContent = 'Builder & Techie';
+  }
+
+  // ---- Reading Progress Bar (blog post pages) ----
+  var progressBar = document.getElementById('readingProgress');
+  if (progressBar && document.querySelector('.blog-post-page')) {
+    window.addEventListener('scroll', function () {
+      var scrollTop = window.scrollY;
+      var docHeight = document.documentElement.scrollHeight - window.innerHeight;
+      var progress = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
+      progressBar.style.width = progress + '%';
+    }, { passive: true });
+  }
 
   // ---- Active Nav Link on Scroll (index page only) ----
-  const sections = document.querySelectorAll('section[id]');
-  const navAnchors = document.querySelectorAll('.nav-links a[href^="#"]');
+  var sections = document.querySelectorAll('section[id]');
+  var navAnchors = document.querySelectorAll('.nav-links a[href^="#"]');
 
   if (sections.length && navAnchors.length) {
     var sectionTops = [];
@@ -104,6 +175,26 @@
     }, { passive: true });
   }
 
+  // ---- Contact Form Handler ----
+  var contactForm = document.getElementById('contactForm');
+  if (contactForm) {
+    contactForm.addEventListener('submit', function (e) {
+      var formAction = contactForm.getAttribute('action');
+      // If no Formspree endpoint configured, fall back to mailto
+      if (!formAction || formAction.indexOf('YOUR_FORM_ID') !== -1) {
+        e.preventDefault();
+        var name = contactForm.querySelector('[name="name"]').value;
+        var email = contactForm.querySelector('[name="email"]').value;
+        var message = contactForm.querySelector('[name="message"]').value;
+        var subject = encodeURIComponent('Portfolio Contact from ' + name);
+        var body = encodeURIComponent('From: ' + name + ' (' + email + ')\n\n' + message);
+        window.location.href = 'mailto:akgnit7@gmail.com?subject=' + subject + '&body=' + body;
+        var status = document.getElementById('formStatus');
+        if (status) status.textContent = 'Opening your email client...';
+      }
+    });
+  }
+
   // ---- Blog Post Data (single source of truth) ----
   var blogPosts = [
     {
@@ -129,6 +220,22 @@
       tags: ['Leadership', 'Engineering-Management', 'Career'],
       url: 'blogs/the-em-shift.html',
       readingTime: '5 min'
+    },
+    {
+      title: 'Designing a High-Throughput Validation Engine',
+      date: '2026-03-05',
+      excerpt: 'A system design deep-dive into building a JSON Schema validation engine that processes millions of financial documents with sub-50ms latency.',
+      tags: ['System-Design', 'Java', 'Architecture', 'FinTech'],
+      url: 'blogs/validation-engine-design.html',
+      readingTime: '7 min'
+    },
+    {
+      title: 'Kubernetes at Scale',
+      date: '2026-02-28',
+      excerpt: 'Hard-won lessons from running 50+ microservices on Kubernetes in production \u2014 from resource tuning to zero-downtime deployments.',
+      tags: ['Kubernetes', 'DevOps', 'Cloud', 'Infrastructure'],
+      url: 'blogs/kubernetes-at-scale.html',
+      readingTime: '6 min'
     }
   ];
 
@@ -165,7 +272,8 @@
     blogPosts.forEach(function (post, i) {
       var card = createBlogCard(post, i, true);
       blogGrid.appendChild(card);
-      observer.observe(card);
+      if (!reducedMotion) observer.observe(card);
+      else card.classList.add('visible');
     });
   }
 

@@ -1275,9 +1275,201 @@ html {
 ::-webkit-scrollbar-thumb { background: var(--color-border-hover); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
+/* ---------- Typewriter ---------- */
+.typewriter-cursor {
+  display: inline-block;
+  width: 3px;
+  height: 0.9em;
+  background: var(--accent-light);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: cursor-blink 0.7s step-end infinite;
+}
+
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* ---------- Card Shimmer ---------- */
+.project-card::after,
+.skill-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.04), transparent);
+  pointer-events: none;
+}
+
+.project-card:hover::after,
+.skill-card:hover::after {
+  animation: shimmer 0.8s ease-out;
+}
+
+@keyframes shimmer {
+  to { left: 150%; }
+}
+
+/* ---------- Reading Progress Bar ---------- */
+.reading-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-light));
+  z-index: 1001;
+  width: 0;
+  pointer-events: none;
+}
+
+/* ---------- Now Section ---------- */
+.now-section {
+  padding: var(--section-padding);
+}
+
+.now-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-top: 2rem;
+}
+
+.now-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  border: var(--glass-border);
+  border-radius: var(--card-radius);
+  padding: 1.5rem 2rem;
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  transition: all var(--transition-medium);
+  transform: translateZ(0);
+}
+
+.now-card:hover {
+  transform: translateY(-4px) translateZ(0);
+  border-color: var(--color-border-hover);
+}
+
+.now-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  margin-top: 0.2rem;
+}
+
+.now-card h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.now-card p {
+  font-size: 0.88rem;
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+/* ---------- Contact Form ---------- */
+.contact-form {
+  max-width: 500px;
+  margin: 2rem auto 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.contact-form input,
+.contact-form textarea {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  padding: 0.85rem 1.25rem;
+  background: var(--color-surface);
+  border: var(--glass-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  transition: border-color var(--transition-fast);
+  outline: none;
+  width: 100%;
+}
+
+.contact-form input::placeholder,
+.contact-form textarea::placeholder {
+  color: var(--color-text-muted);
+}
+
+.contact-form input:focus,
+.contact-form textarea:focus {
+  border-color: var(--accent);
+}
+
+.contact-form textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+.contact-form button {
+  align-self: flex-start;
+}
+
+.contact-form .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+@media (max-width: 480px) {
+  .contact-form .form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.form-status {
+  font-size: 0.85rem;
+  color: var(--accent-light);
+  text-align: center;
+  min-height: 1.2em;
+}
+
+.form-divider {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 1rem 0;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.form-divider::before,
+.form-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--color-border);
+}
+
+/* ---------- Reduced Motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .typewriter-cursor { animation: none; opacity: 1; }
+  .project-card:hover::after,
+  .skill-card:hover::after { animation: none; }
+  .reading-progress { transition: none; }
+}
+
 /* ---------- Print ---------- */
 @media print {
   .navbar, .theme-toggle, .menu-toggle, .mobile-overlay { display: none !important; }
   body { background: #fff; color: #111; }
-  .bg-canvas { display: none !important; }
+  .bg-canvas, .reading-progress { display: none !important; }
 }

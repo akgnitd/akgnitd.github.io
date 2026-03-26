@@ -37,6 +37,9 @@
   }
   </script>
 
+  <meta name="theme-color" content="#05070a" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)" />
+  <link rel="icon" type="image/svg+xml" href="../assets/images/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="../assets/css/main.css" />
@@ -44,6 +47,7 @@
 <body>
 
 <a href="#main" class="skip-to-content">Skip to main content</a>
+<div class="reading-progress" id="readingProgress"></div>
 <canvas id="bg-canvas" class="bg-canvas"></canvas>
 
 <nav class="navbar" id="navbar">
@@ -57,10 +61,10 @@
       <a href="../index.html#contact">Contact</a>
     </div>
     <div class="nav-actions">
-      <!-- <a href="../resume.pdf" class="btn btn-primary" target="_blank" rel="noopener noreferrer">
+      <a href="../resume.pdf" class="btn btn-primary" target="_blank" rel="noopener noreferrer">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Resume
-      </a> -->
+      </a>
       <button id="bgSwitcher" class="btn" style="padding: 0.5rem 0.9rem; margin-right: 0.5rem;" onclick="window.toggleBackgroundMode && window.toggleBackgroundMode()" title="Cycle Background Animation">🌍</button>
       <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark/light mode">
         <span class="icon-moon">🌙</span>
@@ -109,7 +113,7 @@
     <div class="footer-links">
       <a href="https://github.com/akgnitd" target="_blank" rel="noopener noreferrer">GitHub</a>
       <a href="https://linkedin.com/in/akgnitd" target="_blank" rel="noopener noreferrer">LinkedIn</a>
-      <!-- <a href="../resume.pdf" target="_blank" rel="noopener noreferrer">Resume</a> -->
+      <a href="../resume.pdf" target="_blank" rel="noopener noreferrer">Resume</a>
     </div>
   </div>
 </footer>

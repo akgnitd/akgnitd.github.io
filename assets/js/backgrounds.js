@@ -228,7 +228,12 @@
     if (btn) btn.textContent = '\uD83C\uDF0D Bg: ' + MODES[currentMode];
   }
 
-  switchMode(currentMode);
+  // Respect prefers-reduced-motion: default to Off
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    switchMode(3); // Off
+  } else {
+    switchMode(currentMode);
+  }
 
   /* ==========================================================
      Animation Loop
