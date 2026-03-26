@@ -8,7 +8,11 @@
   <meta name="description"
     content="Portfolio of Atul Gupta — Builder & Techie, and NIT Durgapur alumnus. Building scalable systems with Java, Go, Python, and Cloud." />
   <meta name="author" content="Atul Gupta" />
-  
+
+  <!-- Preconnect for faster font loading -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://akgnitd.github.io/" />
@@ -44,25 +48,11 @@
   </script>
 
   <link rel="stylesheet" href="assets/css/main.css" />
-
-  <!-- SVG icon sprite (inline for zero network requests) -->
-  <style>
-    .sr-only {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      margin: -1px;
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-      white-space: nowrap;
-      border: 0;
-    }
-  </style>
 </head>
 
 <body>
 
+<a href="#about" class="skip-to-content">Skip to main content</a>
 <canvas id="bg-canvas" class="bg-canvas"></canvas>
 
   <!-- ==================== NAVIGATION ==================== -->
@@ -87,7 +77,7 @@
               d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
           </svg>
         </a>
-        <!-- <a href="resume.PDF" class="btn btn-primary" target="_blank" rel="noopener noreferrer">
+        <!-- <a href="resume.pdf" class="btn btn-primary" target="_blank" rel="noopener noreferrer">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
@@ -130,7 +120,7 @@
         </div>
 
         <div class="hero-ctas reveal reveal-delay-4">
-        <!-- <a href="resume.PDF" class="btn btn-primary" target="_blank" rel="noopener noreferrer">
+        <!-- <a href="resume.pdf" class="btn btn-primary" target="_blank" rel="noopener noreferrer">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
@@ -500,147 +490,13 @@
       <div class="footer-links">
         <a href="https://github.com/akgnitd" target="_blank" rel="noopener noreferrer">GitHub</a>
         <a href="https://linkedin.com/in/akgnitd" target="_blank" rel="noopener noreferrer">LinkedIn</a>
-        <!-- <a href="resume.PDF" target="_blank" rel="noopener noreferrer">Resume</a> -->
+        <!-- <a href="resume.pdf" target="_blank" rel="noopener noreferrer">Resume</a> -->
       </div>
     </div>
   </footer>
 
   <!-- ==================== SCRIPTS ==================== -->
-  <script>
-    (function () {
-      'use strict';
-
-      // ---- Theme Toggle ----
-      const themeToggle = document.getElementById('themeToggle');
-      const saved = localStorage.getItem('theme');
-      if (saved) document.documentElement.setAttribute('data-theme', saved);
-
-      themeToggle.addEventListener('click', () => {
-        const current = document.documentElement.getAttribute('data-theme');
-        const next = current === 'light' ? 'dark' : 'light';
-        document.documentElement.setAttribute('data-theme', next);
-        localStorage.setItem('theme', next);
-      });
-
-      // ---- Navbar scroll effect ----
-      const navbar = document.getElementById('navbar');
-      window.addEventListener('scroll', () => {
-        navbar.classList.toggle('scrolled', window.scrollY > 50);
-      }, { passive: true });
-
-      // ---- Mobile menu ----
-      const menuToggle = document.getElementById('menuToggle');
-      const navLinks = document.getElementById('navLinks');
-      const overlay = document.getElementById('mobileOverlay');
-
-      function closeMenu() {
-        navLinks.classList.remove('open');
-        menuToggle.classList.remove('active');
-        overlay.classList.remove('active');
-      }
-
-      menuToggle.addEventListener('click', () => {
-        const isOpen = navLinks.classList.toggle('open');
-        menuToggle.classList.toggle('active', isOpen);
-        overlay.classList.toggle('active', isOpen);
-      });
-
-      overlay.addEventListener('click', closeMenu);
-      navLinks.querySelectorAll('a').forEach(link => link.addEventListener('click', closeMenu));
-
-      // ---- Scroll Reveal (IntersectionObserver) ----
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('visible');
-            observer.unobserve(entry.target);
-          }
-        });
-      }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
-
-      document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
-
-      // ---- Active nav link on scroll ----
-      const sections = document.querySelectorAll('section[id]');
-      const navAnchors = document.querySelectorAll('.nav-links a[href^="#"]');
-
-      let sectionTops = [];
-      function calcSectionTops() {
-        sectionTops = Array.from(sections).map(sec => ({
-          id: sec.getAttribute('id'),
-          top: sec.offsetTop - 120
-        }));
-      }
-      window.addEventListener('resize', calcSectionTops, { passive: true });
-      // Minor delay to ensure fonts/layout are loaded before calculating
-      setTimeout(calcSectionTops, 100);
-
-      let scrollTickingNav = false;
-      window.addEventListener('scroll', () => {
-        if (!scrollTickingNav) {
-          window.requestAnimationFrame(() => {
-            let current = '';
-            const scrollY = window.scrollY;
-            sectionTops.forEach(sec => {
-              if (scrollY >= sec.top) current = sec.id;
-            });
-            navAnchors.forEach(a => {
-              a.classList.toggle('active', a.getAttribute('href') === '#' + current);
-            });
-            scrollTickingNav = false;
-          });
-          scrollTickingNav = true;
-        }
-      }, { passive: true });
-
-      // ---- Blog Cards (inline data to avoid CORS on file:// protocol) ----
-      const blogPosts = [
-        {
-          "title": "Scaling with Golang",
-          "date": "2026-03-21",
-          "excerpt": "A deep dive into why we transitioned our mission-critical validation engines to Go — achieving a 40% reduction in P99 latency through lightweight goroutines and efficient memory management.",
-          "tags": ["Golang", "Performance", "Backend", "Architecture"],
-          "url": "blogs/scaling-with-golang.html",
-          "readingTime": "6 min"
-        },
-        {
-          "title": "NLP in FinTech",
-          "date": "2026-03-15",
-          "excerpt": "How we utilize Natural Language Processing to automate risk assessment — implementing custom NER models with Python and spaCy to increase document processing throughput by 3x.",
-          "tags": ["AI", "NLP", "Python", "FinTech"],
-          "url": "blogs/nlp-in-fintech.html",
-          "readingTime": "8 min"
-        },
-        {
-          "title": "The EM Shift",
-          "date": "2026-03-10",
-          "excerpt": "Reflections on transitioning from Staff Engineer to Engineering Manager — balancing technical debt with feature delivery and empowering teams to build sustainable solutions.",
-          "tags": ["Leadership", "Engineering-Management", "Career"],
-          "url": "blogs/the-em-shift.html",
-          "readingTime": "5 min"
-        }
-      ];
-
-      const blogGrid = document.getElementById('blogGrid');
-      if (blogGrid) {
-        blogPosts.forEach((post, i) => {
-          const card = document.createElement('a');
-          card.href = post.url;
-          card.className = 'blog-card reveal reveal-delay-' + (i + 1);
-          card.innerHTML = `
-        <span class="blog-date">${new Date(post.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} · ${post.readingTime} read</span>
-        <h3>${post.title}</h3>
-        <p class="blog-excerpt">${post.excerpt}</p>
-        <div class="blog-tags">${post.tags.map(t => `<span>${t}</span>`).join('')}</div>
-        <span class="read-more">Read article <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></span>
-      `;
-          blogGrid.appendChild(card);
-          observer.observe(card);
-        });
-      }
-
-    })();
-  </script>
+  <script src="assets/js/main.js"></script>
   <script src="assets/js/backgrounds.js"></script>
 
 </body>
