@@ -37,10 +37,17 @@
   }
   </script>
 
+  <meta name="theme-color" content="#05070a" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)" />
+  <link rel="icon" type="image/svg+xml" href="../assets/images/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="../assets/css/main.css" />
 </head>
 <body>
 
+<a href="#main" class="skip-to-content">Skip to main content</a>
+<div class="reading-progress" id="readingProgress"></div>
 <canvas id="bg-canvas" class="bg-canvas"></canvas>
 
 <nav class="navbar" id="navbar">
@@ -54,7 +61,7 @@
       <a href="../index.html#contact">Contact</a>
     </div>
     <div class="nav-actions">
-      <!-- <a href="../resume.PDF" class="btn btn-primary" target="_blank" rel="noopener noreferrer">
+      <!-- <a href="../resume.pdf" class="btn btn-primary" target="_blank" rel="noopener noreferrer">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Resume
       </a> -->
@@ -71,32 +78,195 @@
 </nav>
 <div class="mobile-overlay" id="mobileOverlay"></div>
 
-<main class="blog-post-page">
+<main id="main" class="blog-post-page">
   <div class="blog-post-header">
     <a href="../blog.html" class="back-link">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
       Back to Blog
     </a>
-    <p class="post-meta">March 10, 2026 · 5 min read</p>
+    <p class="post-meta">March 10, 2026 · 22 min read</p>
     <h1>The EM Shift</h1>
   </div>
 
   <article class="blog-post-content">
-    <p>Making the leap from Individual Contributor (IC) to Engineering Manager (EM) is one of the most challenging and rewarding transitions in a tech career. It's not a promotion — it's a <strong>career change</strong>. The skills that made you a great engineer are necessary but far from sufficient for leading a team effectively.</p>
+    <p>The moment I knew it was time to make the shift was not dramatic. There was no epiphany, no lightning bolt. It was a Tuesday standup.</p>
 
-    <h2>The Mindset Shift</h2>
-    <p>As an IC, your value is measured by the code you write, the systems you design, and the problems you solve. As an EM, your value is measured by <strong>the output of your team</strong>. This requires a fundamental shift: from "how can I fix this?" to "how can I <strong>empower the team</strong> to build a sustainable solution?"</p>
-    <p>Early on, I struggled with the urge to jump into code reviews and solve every technical challenge myself. The turning point came when I realized that doing so was actually <strong>hurting</strong> the team — it created bottlenecks, reduced their ownership, and slowed their growth.</p>
+    <p>I was the tech lead on the VKYC platform -- the most complex system our team had built. I knew every line of the codebase. I had designed the state machine, written the WebSocket layer, built the OCR pipeline integration. I was the person everyone came to with questions, the bottleneck for every design decision, the reviewer on every PR. And in that standup, I watched three engineers wait for my input on three unrelated decisions before they could make progress.</p>
 
-    <h2>Balancing Technical Depth</h2>
-    <p>One of the biggest fears engineers have about becoming an EM is losing technical depth. The reality is nuanced: you shift from being the <strong>deepest</strong> expert to being the <strong>broadest</strong>. You need to understand system design, make architectural trade-off decisions, and evaluate technical proposals — but you don't need to be the one writing the implementation.</p>
-    <p>I maintain my technical edge by staying close to design reviews, reading production code (not writing it), and carving out time for personal projects and technical writing. This blog is part of that practice.</p>
+    <p>Three people, blocked. Not because the problems were hard -- they were perfectly capable of solving them. Blocked because they were waiting for <em>me</em>. Because I had made myself the single point of failure for every technical decision on the team.</p>
 
-    <h2>What Actually Matters</h2>
-    <p>The three things that have the highest leverage as an EM are: <strong>hiring well, setting clear context, and removing blockers</strong>. Everything else — process improvements, tool choices, sprint ceremonies — is in service of those three pillars.</p>
-    <p>If you hire great people, give them clear direction, and stay out of their way (while being available when they need you), the team will deliver. The challenge is having the discipline to trust the process and resist the urge to micromanage.</p>
+    <p>After standup, I sat at my desk and did some math. I was spending about 4 hours a day in code reviews, design discussions, and answering Slack questions. My team had 7 engineers. If each one was blocked for even 30 minutes a day waiting for me, that was 3.5 engineer-hours of wasted time per day. 17.5 hours per week. Nearly half an engineer's entire work week, lost to my bottleneck.</p>
 
-    <p>The EM role isn't for everyone, and that's okay. But for those who find joy in multiplying the impact of others, it's incredibly fulfilling.</p>
+    <p>I was the highest-performing individual contributor on the team, and I was also the team's biggest constraint. That realization was uncomfortable. And that discomfort was the beginning of the shift.</p>
+
+    <h2>The First 90 Days: Everything I Did Not Expect</h2>
+
+    <p>I officially moved into the Engineering Manager role three months later. I thought I was prepared. I had read "The Manager's Path" by Camille Fournier. I had talked to other EMs. I had a plan. The plan lasted about a week.</p>
+
+    <p><strong>Week 1: The Identity Crisis.</strong> On Monday morning, I opened my laptop and instinctively went to pull the latest code. Then I stopped. That was not my job anymore. I checked Jira instead. I looked at the sprint board. I read through Slack channels. I felt productive for about 20 minutes. Then I felt lost. What was I supposed to <em>do</em> all day? As an IC, I always knew what to do next: pick up the next ticket, fix the next bug, review the next PR. As an EM, my calendar had three meetings and eight hours of unstructured time. The lack of tangible output was deeply unsettling.</p>
+
+    <p><strong>Week 2-3: The Withdrawal.</strong> I will be honest: I jumped back into code. A production bug came in, and instead of letting the on-call engineer handle it, I dove in and fixed it myself. It took me 20 minutes. It would have taken the on-call engineer maybe an hour. I told myself I was being helpful. In reality, I was feeding an addiction to the dopamine of solving problems directly, and I was robbing that engineer of a learning opportunity and the confidence that comes from handling production issues independently.</p>
+
+    <p><strong>Week 4-6: The Overcorrection.</strong> After realizing I was doing too much IC work, I swung to the other extreme. I stopped looking at code entirely. I stopped attending design reviews. I focused exclusively on "management stuff" -- 1:1s, sprint planning, stakeholder meetings, roadmap documents. Within two weeks, the team started making architectural decisions that I disagreed with. Not because they were wrong, but because they lacked context that I had. I had overcorrected from "doing everything" to "doing nothing technical," and neither extreme was right.</p>
+
+    <p><strong>Week 7-12: Finding the Balance.</strong> This is when things started clicking. I found a rhythm that worked: stay close enough to the technology to provide context and catch architectural issues, but far enough away that the team owns the implementation. Attend design reviews, read production code, ask questions -- but do not write code, do not review every PR, and do not make decisions that the team should make.</p>
+
+    <p>The rule I settled on: <strong>If someone on the team can make this decision and it is reversible, they should make it. If it is irreversible or requires cross-team context that only I have, I should make it.</strong> This simple heuristic eliminated 80% of the bottlenecking I was creating.</p>
+
+    <h2>The Frameworks That Saved Me</h2>
+
+    <p>I am an engineer. I think in systems and frameworks. So naturally, I built frameworks for the management stuff that felt ambiguous. Here are the ones that stuck.</p>
+
+    <h3>1:1 Templates</h3>
+
+    <p>My 1:1s were terrible at first. "How are things going?" "Fine." "Anything I can help with?" "Not really." "Cool. See you next week." Useless.</p>
+
+    <p>I developed a rotating template that gives 1:1s structure without making them feel like an interrogation:</p>
+
+    <p><strong>Week 1 -- Career and Growth:</strong> What skill are you most excited about developing right now? What is one thing you wish you had more time for? Where do you want to be in a year, and what is the gap between here and there?</p>
+
+    <p><strong>Week 2 -- Work and Blockers:</strong> What is the most frustrating thing you dealt with this week? What is taking longer than it should? If you could change one thing about how we work, what would it be?</p>
+
+    <p><strong>Week 3 -- Team and Culture:</strong> How is collaboration within the team feeling? Is there anyone you think is struggling that I should be aware of? What would make this team better?</p>
+
+    <p><strong>Week 4 -- Feedback (Bidirectional):</strong> Here is one thing I think you did really well recently. Here is one area I think you could grow. Now tell me -- what am I doing that is helping you? What am I doing that is not?</p>
+
+    <p>The key insight: <strong>the same question asked every week gets stale answers. Rotating questions surfaces different information.</strong> The career questions in Week 1 are how I learned that one of my best engineers was thinking about leaving because he felt stuck. The team questions in Week 3 are how I discovered a collaboration breakdown between two engineers that was costing us a week per sprint in rework. Neither of these would have surfaced in a "how are things going?" conversation.</p>
+
+    <h3>Team Health Metrics</h3>
+
+    <p>I track team health across five dimensions, measured monthly through a combination of data and surveys:</p>
+
+    <p><strong>Delivery Velocity:</strong> Story points completed per sprint (yes, I know points are imperfect, but the trend over time is useful). Are we accelerating, steady, or decelerating? Deceleration for two consecutive sprints triggers a retrospective focused specifically on what changed.</p>
+
+    <p><strong>Quality:</strong> Production incidents per month, bugs found in QA vs production, rollback rate. If production incidents are increasing, something is wrong -- either we are shipping faster than our testing can keep up, or we have accumulated too much technical debt.</p>
+
+    <p><strong>Cycle Time:</strong> Time from "in progress" to "deployed." This is the metric I care about most because it reflects the full pipeline: coding time, review time, QA time, and deployment time. Our target is under 3 days for a standard feature. When cycle time creeps up, I look at where the bottleneck is -- usually PR review wait time or QA queue depth.</p>
+
+    <p><strong>Engagement:</strong> A monthly anonymous 3-question survey: "I am excited about the work I am doing" (1-5), "I feel supported by my manager and team" (1-5), "I see a clear path for my growth here" (1-5). Anything below 3.5 average on any question is a red flag. I do not care about the absolute score as much as the trend -- a drop of 0.5 or more in a month means something changed and I need to figure out what.</p>
+
+    <p><strong>Technical Health:</strong> Test coverage trend, dependency freshness (how many major versions behind are we on key libraries), deployment frequency, and mean time to recovery (MTTR) after incidents. These are the DORA metrics, and they are the best proxy we have for the health of our engineering practices.</p>
+
+    <h3>Incident Management Framework</h3>
+
+    <p>Before I became EM, our incident process was "whoever is awake fixes it and posts in Slack." That does not scale. I implemented a structured incident management process:</p>
+
+    <p><strong>During the incident:</strong> An incident commander is designated (rotates weekly). They own communication -- posting updates to the status channel every 15 minutes, coordinating with the on-call engineer who is doing the actual debugging. Separation of communication and debugging is critical: you cannot write coherent stakeholder updates while you are deep in log analysis.</p>
+
+    <p><strong>After the incident (within 48 hours):</strong> A blameless post-mortem document with five sections: (1) Timeline of events, (2) Root cause, (3) Impact (users affected, duration, revenue impact), (4) What went well during response, (5) Action items with owners and deadlines. The blameless part is non-negotiable. If people fear blame, they hide information, and hidden information causes longer outages.</p>
+
+    <p><strong>Monthly incident review:</strong> I review all incidents from the month with the team. We look for patterns. Are we seeing the same root cause repeatedly? Is one service disproportionately represented? Are our action items actually getting completed, or are they languishing in a Jira backlog? Pattern recognition across incidents is where the real learning happens.</p>
+
+    <h2>Staying Technical: The Discipline and the Practice</h2>
+
+    <p>The biggest fear engineers have about becoming an EM is becoming irrelevant technically. "If I stop coding for a year, will I be able to go back?" The honest answer is: yes, but only if you are disciplined about staying close to the technology.</p>
+
+    <p>Here is what I do:</p>
+
+    <p><strong>Attend every design review.</strong> Not to approve or reject, but to ask questions. "What happens if this service goes down?" "How does this handle a 10x traffic spike?" "What is the migration path if this design assumption turns out to be wrong?" Good questions are more valuable than good answers, and asking questions forces me to understand the system at an architectural level.</p>
+
+    <p><strong>Read production code weekly.</strong> Every Friday, I spend 30-60 minutes reading recently merged code. Not reviewing it (that is the team's job), just reading it. This keeps me calibrated on code quality, architectural patterns, and where the complexity is accumulating. If I notice a pattern I want to discuss, I bring it up in the next team sync -- not as a criticism, but as a conversation: "I noticed we are handling retries differently in three services. Should we standardize?"</p>
+
+    <p><strong>Write this blog.</strong> Explaining technical concepts in writing forces me to understand them deeply. If I cannot explain our OCR pipeline in a blog post, I do not understand it well enough. Writing is thinking, and technical writing is technical thinking.</p>
+
+    <p><strong>Build side projects.</strong> I maintain a small personal project where I experiment with new technologies. Recently I rebuilt a personal tool in Rust just to understand ownership and lifetimes. I will probably never use Rust at work, but understanding its memory model makes me a better reviewer of Go code and a better participant in "build vs buy" discussions.</p>
+
+    <p><strong>Participate in architecture decisions, not implementation decisions.</strong> "Should we use Redis Streams or Kafka for this workload?" is an architecture decision -- I should be involved. "Should this function use a map or a slice?" is an implementation decision -- the engineer owns that.</p>
+
+    <h2>The Three Highest-Leverage Activities</h2>
+
+    <p>After two years in the EM role, I have concluded that three activities generate disproportionate value compared to everything else. If I could only do three things, these would be them:</p>
+
+    <h3>1. Hiring</h3>
+
+    <p>A single great hire changes the trajectory of the entire team. A single bad hire drains the energy of the entire team. Nothing else I do has this kind of multiplicative impact.</p>
+
+    <p>I spend about 25% of my time on hiring-related activities: writing job descriptions, reviewing resumes, conducting interviews, debriefing with the hiring panel, calibrating on leveling. It feels like a lot. It is not enough.</p>
+
+    <p>The things I have learned about hiring:</p>
+    <ul>
+      <li><strong>Hire for slope, not intercept.</strong> A less-experienced engineer who learns fast and asks good questions will outperform a more-experienced engineer who coasts on existing knowledge within 6 months. I weight learning trajectory heavily in interviews.</li>
+      <li><strong>The best signal is a work sample.</strong> We give candidates a take-home exercise that mirrors actual work: review this PR, design this system, debug this production issue. It takes them 2-3 hours and gives us 10x more signal than a whiteboard coding question.</li>
+      <li><strong>Sell the mission, not the perks.</strong> Great engineers want to work on interesting problems with competent people. If I have to sell them on the free lunch, I have already lost. In every interview, I spend time explaining the technical challenges we are solving and why they matter. The engineers who light up at the problems are the ones we want.</li>
+    </ul>
+
+    <h3>2. Context-Setting</h3>
+
+    <p>The second highest-leverage activity is making sure every person on the team understands the <em>why</em> behind what they are building. Not just "build this feature" but "here is the business problem, here is why this solution was chosen over alternatives, here is what success looks like, and here is what happens if we get it wrong."</p>
+
+    <p>Engineers with context make better decisions autonomously. Engineers without context optimize for the wrong things or, worse, build the right thing in the wrong way because they did not understand the constraints.</p>
+
+    <p>I do this through:</p>
+    <ul>
+      <li><strong>Monthly context-setting sessions.</strong> 30 minutes where I share what is happening at the company level, what our team's priorities are for the next month, and why. I also share metrics: revenue impact of our platform, customer satisfaction scores, operational metrics. People work harder and smarter when they can see the impact of their work.</li>
+      <li><strong>Writing "intent documents" for major projects.</strong> Before a project kicks off, I write a 1-2 page document covering: what problem are we solving, who is it for, what does success look like (with specific metrics), what are the constraints (timeline, budget, dependencies), and what are the known unknowns. This document becomes the North Star for the project team.</li>
+      <li><strong>Repeating myself.</strong> The biggest communication mistake I made early on was saying something once and assuming it was heard and understood. It was not. Important messages need to be communicated at least three times, in at least two different formats (written + verbal), before they stick. I tell the team our priorities in the monthly context session, write them in a Slack post, and reference them in sprint planning. Repetition is not a bug -- it is a feature of effective communication.</li>
+    </ul>
+
+    <h3>3. Unblocking</h3>
+
+    <p>The third highest-leverage activity is removing obstacles that the team cannot remove themselves. These usually fall into three categories:</p>
+
+    <p><strong>Cross-team dependencies.</strong> "We need the platform team to update the API, but they are swamped." This is where my network and organizational capital matter. I can escalate, negotiate priorities, or find creative workarounds that an IC cannot.</p>
+
+    <p><strong>Ambiguity from product or leadership.</strong> "The requirements are unclear and we cannot get a decision." I can walk into a room with the product lead and say "We are blocked until this is resolved. Can we decide right now?" and have the organizational standing to make that happen.</p>
+
+    <p><strong>Process friction.</strong> "Our deployment pipeline takes 45 minutes and we have to deploy during a 2-hour window." I can prioritize engineering investment in CI/CD improvements that benefit the team's daily experience, even if they do not show up as product features on the roadmap.</p>
+
+    <p>The common thread is that these are all problems that require organizational leverage, not technical skill. They are problems an IC could theoretically solve but practically cannot, because they require influencing people and priorities outside the team's boundary. That is the EM's unique superpower.</p>
+
+    <h2>Mistakes I Made Early (So You Do Not Have To)</h2>
+
+    <p><strong>Mistake 1: Jumping into code reviews.</strong> For the first two months, I reviewed every PR. I told myself it was about "maintaining quality" but it was really about control. The result: PRs sat in my review queue for hours because I was in meetings, the team stopped reviewing each other's code (because they knew I would), and I became a single point of failure. The fix was simple: I removed myself from the default reviewers list and designated two senior engineers as code review leads. Code quality did not drop. In fact, it improved, because the reviewers were closer to the code and caught more context-specific issues than I did.</p>
+
+    <p><strong>Mistake 2: Solving problems instead of coaching through them.</strong> An engineer came to me with a tricky database performance issue. My instinct: "Oh, I know how to fix that. You need to add a composite index on columns X and Y, and rewrite the query to use a covering index." I gave them the answer in 30 seconds. They went and implemented it. Problem solved, right? Wrong. Next time they hit a performance issue, they came back to me. I had taught them nothing. I had taught them that I was the performance oracle.</p>
+
+    <p>The better approach (which I learned painfully): "Interesting problem. What have you tried so far? What did the EXPLAIN output look like? What is your hypothesis for why it is slow?" Lead them to the answer. It takes 15 minutes instead of 30 seconds, but they learn the problem-solving approach, not just the answer. The next time, they solve it themselves.</p>
+
+    <p><strong>Mistake 3: Avoiding hard conversations.</strong> I had an engineer who was consistently underperforming. Deadlines missed, code quality below the team's standard, disengaged in meetings. For two months, I told myself "they are just going through a rough patch" and "I do not want to demotivate them by being too critical." I gave vague feedback: "I think you could be more proactive." Nothing changed.</p>
+
+    <p>When I finally had the direct conversation -- "Your output has been below expectations for the last two months. Specifically, X, Y, and Z. I want to help you get back on track. What is going on?" -- it turned out they were dealing with a personal situation that was affecting their focus. We worked out a reduced-responsibility plan for a month, they got through the situation, and they became one of the team's strongest contributors. The conversation I had been avoiding was the conversation they needed.</p>
+
+    <p><strong>Mistake 4: Measuring my output by visible activity.</strong> In the early months, I felt guilty if I was not in a meeting, writing a document, or sending a message. I equated busyness with productivity. The reality is that some of the highest-value EM activities are invisible: thinking deeply about team structure, planning who should work on what to maximize growth, having a casual coffee with a peer EM to align on cross-team priorities. The EM job has a lot of "white space" that feels unproductive but is essential.</p>
+
+    <h2>How I Measure Team Health (The Dashboard I Actually Use)</h2>
+
+    <p>I am a data person, so I built a lightweight dashboard (really just a Google Sheet with some automated data pulls) that I review every Monday morning. Here is what is on it:</p>
+
+    <p><strong>DORA Metrics:</strong></p>
+    <ul>
+      <li><strong>Deployment frequency:</strong> How often we ship to production. Target: at least once per day. Current: 1.4 deployments/day.</li>
+      <li><strong>Lead time for changes:</strong> Time from first commit to production. Target: under 2 days. Current: 1.6 days.</li>
+      <li><strong>Mean time to recovery (MTTR):</strong> Time from incident detection to resolution. Target: under 1 hour. Current: 42 minutes.</li>
+      <li><strong>Change failure rate:</strong> Percentage of deployments that cause an incident. Target: under 5%. Current: 3.2%.</li>
+    </ul>
+
+    <p>These four metrics, tracked over time, tell me almost everything I need to know about whether our engineering practices are healthy. A team that deploys frequently, ships quickly, recovers fast, and rarely breaks things is a team that is working well. A team where any of these metrics are degrading has a problem that needs attention.</p>
+
+    <p><strong>People Metrics:</strong></p>
+    <ul>
+      <li><strong>PR review turnaround time:</strong> Time from PR opened to first review. Target: under 4 hours. This is a proxy for collaboration health. If reviews are slow, people are either overloaded or disengaged.</li>
+      <li><strong>On-call load distribution:</strong> Are the same people always on-call, or is it distributed fairly? Burnout hides in uneven on-call distribution.</li>
+      <li><strong>Meeting load per person:</strong> Hours per week in meetings. If anyone exceeds 15 hours/week, I investigate. Engineers need focused time to do their best work.</li>
+    </ul>
+
+    <h2>Advice for Engineers Considering the Switch</h2>
+
+    <p>If you are reading this and thinking about moving into management, here is my honest advice:</p>
+
+    <p><strong>Try it before you commit.</strong> Ask your current manager if you can act as a tech lead or team lead for a quarter. Run the standups, facilitate the retrospectives, handle the stakeholder communication, do the 1:1s. If you find energy in those activities, management might be for you. If you find them draining and you miss coding all day, that is important data.</p>
+
+    <p><strong>Understand what you are giving up.</strong> You are giving up the satisfaction of personally building things. The dopamine hit of fixing a bug, shipping a feature, seeing your code in production -- that goes away, or at least becomes much rarer. In exchange, you get the satisfaction of watching your team grow, ship, and succeed. That is a different kind of satisfaction, and it is not for everyone.</p>
+
+    <p><strong>It is not a one-way door.</strong> Many companies (including ours) support moving back from EM to IC. I know several excellent engineers who tried management for a year, decided it was not for them, and went back to being ICs. They were better ICs for having had the management experience, because they understood the organizational context that most ICs never see. There is no shame in trying it and going back.</p>
+
+    <p><strong>Your first year will be hard.</strong> You will feel incompetent. You will feel like you are not adding value. You will miss coding. You will make mistakes with people that feel worse than any production bug. This is normal. Give yourself grace. The learning curve is steep, but it flattens.</p>
+
+    <p><strong>Read these three books:</strong> "The Manager's Path" by Camille Fournier (the best overview of the EM role at different levels), "An Elegant Puzzle" by Will Larson (systems thinking applied to engineering management), and "Radical Candor" by Kim Scott (the communication framework that changed how I give feedback). If you read these three before or during your first year, you will avoid 50% of the mistakes I made.</p>
+
+    <p>The EM role is not a promotion from engineering. It is a career change into a related but fundamentally different discipline. The skills overlap (systems thinking, problem-solving, communication) but the day-to-day is completely different. If you find joy in multiplying the impact of others -- in making 8 people 20% more effective rather than being 1 person who is 200% effective -- it is one of the most rewarding roles in tech.</p>
+
+    <p>Two years in, I still miss writing code some days. But when I watch an engineer I mentored lead a design review with confidence, or when the team ships a major project on time because the process we built actually works, or when someone tells me in a 1:1 that this is the best team they have ever been on -- those moments make the trade-off worth it. Every single time.</p>
   </article>
 </main>
 
@@ -106,26 +276,12 @@
     <div class="footer-links">
       <a href="https://github.com/akgnitd" target="_blank" rel="noopener noreferrer">GitHub</a>
       <a href="https://linkedin.com/in/akgnitd" target="_blank" rel="noopener noreferrer">LinkedIn</a>
-      <!-- <a href="../resume.PDF" target="_blank" rel="noopener noreferrer">Resume</a> -->
+      <!-- <a href="../resume.pdf" target="_blank" rel="noopener noreferrer">Resume</a> -->
     </div>
   </div>
 </footer>
 
-<script>
-(function() {
-  const t = document.getElementById('themeToggle');
-  const s = localStorage.getItem('theme');
-  if (s) document.documentElement.setAttribute('data-theme', s);
-  t.addEventListener('click', () => { const n = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light'; document.documentElement.setAttribute('data-theme', n); localStorage.setItem('theme', n); });
-  const nb = document.getElementById('navbar');
-  window.addEventListener('scroll', () => nb.classList.toggle('scrolled', window.scrollY > 50), { passive: true });
-  const mt = document.getElementById('menuToggle'), nl = document.getElementById('navLinks'), ov = document.getElementById('mobileOverlay');
-  function cm() { nl.classList.remove('open'); mt.classList.remove('active'); ov.classList.remove('active'); }
-  mt.addEventListener('click', () => { const o = nl.classList.toggle('open'); mt.classList.toggle('active', o); ov.classList.toggle('active', o); });
-  ov.addEventListener('click', cm);
-  nl.querySelectorAll('a').forEach(l => l.addEventListener('click', cm));
-})();
-</script>
+<script src="../assets/js/main.js"></script>
 <script src="../assets/js/backgrounds.js"></script>
 </body>
 </html>

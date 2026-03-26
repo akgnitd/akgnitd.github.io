@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>404 — Page Not Found</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" type="image/svg+xml" href="assets/images/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="assets/css/main.css" />
+</head>
+<body>
+
+<a href="#main" class="skip-to-content">Skip to main content</a>
+<canvas id="bg-canvas" class="bg-canvas"></canvas>
+
+<nav class="navbar" id="navbar">
+  <div class="container">
+    <a href="index.html" class="nav-logo">atul<span>.</span></a>
+    <div class="nav-links" id="navLinks">
+      <a href="index.html#about">About</a>
+      <a href="index.html#skills">Skills</a>
+      <a href="index.html#projects">Projects</a>
+      <a href="index.html#experience">Experience</a>
+      <a href="blog.html">Blog</a>
+      <a href="index.html#contact">Contact</a>
+    </div>
+    <div class="nav-actions">
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark/light mode">
+        <span class="icon-moon">🌙</span>
+        <span class="icon-sun">☀️</span>
+      </button>
+      <button class="menu-toggle" id="menuToggle" aria-label="Open menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</nav>
+<div class="mobile-overlay" id="mobileOverlay"></div>
+
+<main id="main" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:var(--section-padding);padding-top:120px;text-align:center;">
+  <div>
+    <p class="section-label" style="justify-content:center;">Error 404</p>
+    <h1 class="section-title" style="margin-bottom:1rem;">Page Not Found</h1>
+    <p style="color:var(--color-text-secondary);max-width:480px;margin:0 auto 2rem;line-height:1.7;">The page you're looking for doesn't exist or has been moved.</p>
+    <a href="index.html" class="btn btn-primary">Back to Home</a>
+  </div>
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-left">
+      <p>&copy; 2026 Atul Gupta.</p>
+    </div>
+    <div class="footer-links">
+      <a href="https://github.com/akgnitd" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <a href="https://linkedin.com/in/akgnitd" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+    </div>
+  </div>
+</footer>
+
+<script src="assets/js/main.js"></script>
+<script src="assets/js/backgrounds.js"></script>
+</body>
+</html>

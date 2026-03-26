@@ -37,10 +37,17 @@
   }
   </script>
 
+  <meta name="theme-color" content="#05070a" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)" />
+  <link rel="icon" type="image/svg+xml" href="../assets/images/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="../assets/css/main.css" />
 </head>
 <body>
 
+<a href="#main" class="skip-to-content">Skip to main content</a>
+<div class="reading-progress" id="readingProgress"></div>
 <canvas id="bg-canvas" class="bg-canvas"></canvas>
 
 <nav class="navbar" id="navbar">
@@ -54,7 +61,7 @@
       <a href="../index.html#contact">Contact</a>
     </div>
     <div class="nav-actions">
-      <!-- <a href="../resume.PDF" class="btn btn-primary" target="_blank" rel="noopener noreferrer">
+      <!-- <a href="../resume.pdf" class="btn btn-primary" target="_blank" rel="noopener noreferrer">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Resume
       </a> -->
@@ -71,30 +78,224 @@
 </nav>
 <div class="mobile-overlay" id="mobileOverlay"></div>
 
-<main class="blog-post-page">
+<main id="main" class="blog-post-page">
   <div class="blog-post-header">
     <a href="../blog.html" class="back-link">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
       Back to Blog
     </a>
-    <p class="post-meta">March 15, 2026 · 8 min read</p>
+    <p class="post-meta">March 15, 2026 · 20 min read</p>
     <h1>NLP in FinTech</h1>
   </div>
 
   <article class="blog-post-content">
-    <p>In the lending industry, risk assessment traditionally relies on manual document review — a process that's slow, error-prone, and difficult to scale. We set out to change that by applying <strong>Natural Language Processing (NLP)</strong> to automate the extraction and analysis of critical information from financial documents.</p>
+    <p>Picture this: a customer is sitting on a video call with one of our KYC agents. They hold up their PAN card to the camera. The agent captures a screenshot. And now we have exactly 8 seconds -- the amount of time a person will tolerate staring at a "processing" spinner before they start wondering if something broke -- to extract every field from that document, verify it is not tampered with, cross-reference it against the details they provided, and return a pass/fail verdict to the agent's screen.</p>
 
-    <h2>The Challenge</h2>
-    <p>Financial documents — bank statements, salary slips, ITR forms — come in wildly different formats. Traditional rule-based extraction breaks down when faced with this variability. We needed a system that could <strong>understand</strong> the structure and semantics of these documents, not just pattern-match on fixed templates.</p>
+    <p>Eight seconds. For OCR, tampering detection, field extraction, validation, and database persistence. On a document image that might be blurry, rotated 15 degrees, photographed under fluorescent lighting, and compressed to JPEG quality 40 by the customer's phone camera.</p>
 
-    <h2>Our Approach</h2>
-    <p>We built custom <strong>Named Entity Recognition (NER)</strong> models using <strong>Python and spaCy</strong>, trained on a corpus of financial documents specific to the Indian lending market. The model identifies entities like employer names, salary amounts, account numbers, and transaction patterns with high accuracy.</p>
-    <p>The pipeline combines OCR (for scanned documents), NER (for entity extraction), and a classification layer (for document type detection) into a single end-to-end service. Everything runs as a microservice with configurable feature flags, allowing us to enable or disable individual processing stages based on the use case.</p>
+    <p>That is the problem we solved in our VKYC (Video KYC) AI service at Credit Saison. And the journey from "this kind of works on good images" to "98.7% accuracy on real-world documents in production" was one of the most technically interesting projects I have worked on. Let me walk you through the entire pipeline, code included.</p>
 
-    <h2>Impact</h2>
-    <p>The results were significant: <strong>3x increase in document processing throughput</strong> while maintaining <strong>98% accuracy</strong> in entity extraction. What previously took a human reviewer 15 minutes per application now completes in under 10 seconds. The system processes thousands of applications daily, directly impacting approval speed and customer experience.</p>
+    <h2>Why Indian Financial Documents Are Uniquely Hard</h2>
 
-    <p>The key takeaway: domain-specific NLP models, when trained on the right data, vastly outperform generic solutions. The investment in building a custom training pipeline paid for itself within the first quarter of deployment.</p>
+    <p>If you have worked with OCR on, say, US driver's licenses or European passports, you might think document extraction is a solved problem. And for those documents, it largely is -- standardized layouts, high print quality, machine-readable zones. The tooling is mature.</p>
+
+    <p>Indian financial documents are a different animal entirely. Here is what makes them challenging:</p>
+
+    <p><strong>PAN Cards:</strong> India's tax ID card. The format has changed multiple times since its introduction. Older cards have a different font, different layout, and the lamination has often yellowed. The PAN number itself (e.g., ABCDE1234F) follows a specific pattern: 5 letters, 4 digits, 1 letter. The fourth character encodes the holder type (P for individual, C for company, etc.). We validate this pattern after extraction. But here is the fun part: many PAN cards are photocopies of photocopies, and some people laminate them with bubble wrap-textured plastic that creates optical interference patterns.</p>
+
+    <p><strong>Aadhaar Cards:</strong> India's biometric ID. The 12-digit number has a Verhoeff checksum that we validate. But Aadhaar cards come in multiple formats: the original card, the e-Aadhaar PDF printout (which has a QR code), and the mAadhaar app screenshot. Each has a completely different layout. Also, per UIDAI regulations, we must mask all but the last 4 digits after extraction -- which means our pipeline needs to extract the full number for validation but store only the masked version.</p>
+
+    <p><strong>Address Proofs:</strong> Utility bills, bank statements, rental agreements -- each from a different provider with a different layout. There are hundreds of electricity boards across Indian states, each with their own bill format. We cannot template-match our way through this. We need actual semantic understanding of the document structure.</p>
+
+    <p><strong>Image Quality:</strong> Most of our documents come from phone cameras during a live video call. The customer is holding the document up to their webcam or phone camera. We see motion blur, perspective distortion, partial occlusion (their thumb is covering the corner), glare from overhead lights, and JPEG compression artifacts from the video codec. About 30% of the images we receive need some form of preprocessing before OCR has any chance of working.</p>
+
+    <h2>The OCR Pipeline: From Raw Image to Structured Data</h2>
+
+    <p>Our pipeline has five stages: preprocessing, OCR, field extraction, validation, and tampering detection. Let me walk through each one with the actual code.</p>
+
+    <h3>Stage 1: Image Preprocessing (Deskewing)</h3>
+
+    <p>The single most impactful preprocessing step is deskewing -- correcting the rotation of the document. When someone holds a PAN card at a 10-degree angle to the camera, OCR accuracy drops from ~95% to ~70%. Fix the rotation, and you are back to 95%. Here is our production deskewing code:</p>
+
+    <pre><code>def _deskew_image(image: np.ndarray) -> np.ndarray:
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    gray = cv2.GaussianBlur(gray, (5, 5), 0)
+    edges = cv2.Canny(gray, 50, 150, apertureSize=3)
+    lines = cv2.HoughLinesP(
+        edges, 1, np.pi/180, 100,
+        minLineLength=100, maxLineGap=10
+    )
+    if lines is not None:
+        angles = []
+        for line in lines:
+            x1, y1, x2, y2 = line[0]
+            angle = np.arctan2(y2 - y1, x2 - x1) * 180 / np.pi
+            if -45 < angle < 45:
+                angles.append(angle)
+        if angles:
+            median_angle = np.median(angles)
+            (h, w) = image.shape[:2]
+            center = (w // 2, h // 2)
+            M = cv2.getRotationMatrix2D(center, median_angle, 1.0)
+            rotated = cv2.warpAffine(
+                image, M, (w, h),
+                flags=cv2.INTER_CUBIC,
+                borderMode=cv2.BORDER_REPLICATE
+            )
+            return rotated
+    return image</code></pre>
+
+    <p>Let me explain the design decisions here because they are not obvious:</p>
+
+    <p><strong>Gaussian blur before edge detection.</strong> The <code>(5, 5)</code> kernel smooths out noise (JPEG artifacts, paper texture) while preserving the strong edges we care about (document borders, text lines). Without this, Canny edge detection picks up hundreds of spurious edges from compression artifacts, and the Hough transform returns garbage.</p>
+
+    <p><strong>Hough Probabilistic line detection.</strong> We use <code>HoughLinesP</code> (the probabilistic variant) instead of <code>HoughLines</code> because it is faster and returns line segments rather than infinite lines. The parameters matter: <code>minLineLength=100</code> ignores short edges (text characters, card features) and only picks up long structural lines (card edges, text baselines). <code>maxLineGap=10</code> allows small breaks in a line (from wear and tear on the card).</p>
+
+    <p><strong>Angle filtering: <code>-45 < angle < 45</code>.</strong> This filters out vertical lines. We only want horizontal-ish lines because they indicate the text baseline orientation. If the card is tilted 10 degrees clockwise, the horizontal text lines will show up at 10 degrees in the Hough output.</p>
+
+    <p><strong>Median angle, not mean.</strong> Outliers are common (a scratch on the card, a crease that creates a diagonal line). The median is robust to these outliers. In testing, mean angle was off by 3-5 degrees about 15% of the time. Median was off by more than 1 degree less than 2% of the time.</p>
+
+    <p><strong><code>BORDER_REPLICATE</code> for padding.</strong> When you rotate an image, the corners get cropped and new areas need to be filled. <code>BORDER_REPLICATE</code> extends the edge pixels outward, which looks natural for document images. The alternative, <code>BORDER_CONSTANT</code> (black fill), confuses the OCR engine because it sees a hard black border around the document.</p>
+
+    <p>This single function improved our overall OCR accuracy from 91.2% to 96.4% on the test set. That is a 5.2 percentage point improvement from a 30-line function. Preprocessing is where the highest ROI lives in any OCR pipeline.</p>
+
+    <h3>Stage 2: OCR with EasyOCR</h3>
+
+    <p>We evaluated three OCR engines: Tesseract, Google Vision API, and EasyOCR. Here is why we chose EasyOCR:</p>
+
+    <ul>
+      <li><strong>Tesseract:</strong> Good accuracy on clean, high-DPI scans. Falls apart on camera-captured images with variable lighting. Also struggles with the mix of English and Hindi/Devanagari text that appears on many Indian documents (the PAN card has both). Accuracy on our test set: 87.3%.</li>
+      <li><strong>Google Vision API:</strong> Excellent accuracy (97.1% on our test set) but introduces a network round-trip to Google's servers. For our 8-second latency budget, adding 200-400ms of network latency per document was problematic. Also, sending identity documents to a third-party API raises data residency concerns with our compliance team. Non-starter.</li>
+      <li><strong>EasyOCR:</strong> Runs locally (no data leaves our infrastructure), supports 80+ languages including Hindi and English simultaneously, and handles camera-captured images well because the model was trained on real-world images, not just clean scans. Accuracy on our test set: 95.8%. After our preprocessing pipeline: 98.7%.</li>
+    </ul>
+
+    <p>The accuracy gap between EasyOCR and Google Vision (95.8% vs 97.1% raw) closed to virtually nothing once we added our preprocessing pipeline (98.7% vs 97.1%). Preprocessing is the great equalizer.</p>
+
+    <h3>Stage 3: Tampering Detection</h3>
+
+    <p>This is the part that keeps me up at night, because financial document fraud is a real and growing problem. Our tampering detection runs three independent checks on every document:</p>
+
+    <pre><code>def _check_tampering(image: np.ndarray, image_bytes: bytes) -> dict:
+    results = {
+        "edge_consistency": _check_edge_consistency(image),
+        "compression_analysis": _check_compression_artifacts(image),
+        "metadata_sanity": _check_metadata(image_bytes),
+        "is_tampered": False,
+        "confidence": 0.0,
+        "flags": []
+    }
+
+    # Weighted scoring: each check contributes to overall confidence
+    weights = {
+        "edge_consistency": 0.4,
+        "compression_analysis": 0.35,
+        "metadata_sanity": 0.25
+    }
+
+    total_score = sum(
+        results[check]["score"] * weights[check]
+        for check in weights
+    )
+
+    results["confidence"] = round(total_score, 3)
+    results["is_tampered"] = total_score > 0.65
+
+    # Collect all flags from sub-checks
+    for check in weights:
+        results["flags"].extend(results[check].get("flags", []))
+
+    return results</code></pre>
+
+    <p>Let me break down each check:</p>
+
+    <p><strong>1. Edge Consistency Analysis.</strong> When someone edits a document in Photoshop -- changing a name, altering a date -- the edges around the edited region look different from the rest of the document. Natural document edges (printed text, card borders) have consistent characteristics: similar contrast, similar sharpness, gradual transitions. Edited regions often show artificially sharp edges, uniform color boundaries, or inconsistent blur patterns.</p>
+
+    <p>We use the Laplacian operator to detect edges across the entire image, then divide the image into a grid and compare the edge distribution statistics (mean, variance, kurtosis) across regions. If one region has dramatically different edge statistics, it is flagged. This catches about 70% of amateur tampering attempts.</p>
+
+    <p><strong>2. JPEG Compression Artifact Analysis.</strong> This is my favorite check because it exploits the physics of how JPEG compression works. When a JPEG image is saved, it is divided into 8x8 pixel blocks, and each block is compressed independently. If someone opens the image, edits a region, and saves it again, the edited region has been through one round of compression, while the rest of the image has been through two rounds. This difference is detectable.</p>
+
+    <p>We analyze the DCT (Discrete Cosine Transform) coefficients across the image and look for inconsistencies in the quantization pattern. Double-compressed regions have a distinct statistical signature in their DCT coefficients. This is the same technique used in forensic image analysis and it catches sophisticated tampering that edge analysis misses.</p>
+
+    <p><strong>3. Metadata and Resolution Sanity.</strong> This is the simplest check but catches a surprising amount of fraud. We look at EXIF data (if present), image resolution, and DPI consistency. A PAN card photographed on a phone camera will have specific EXIF markers (camera model, GPS data if not stripped, creation timestamp). A PAN card that was created in Photoshop will either have Photoshop-specific EXIF data or suspiciously clean/missing metadata. We also check if the resolution is consistent -- a 300 DPI scan with one region at 150 DPI is a red flag.</p>
+
+    <p>The weighted scoring is calibrated based on 6 months of production data. We started with equal weights (0.33 each) and adjusted based on false positive / false negative rates. Edge consistency gets the highest weight (0.4) because it has the best true positive rate on our fraud dataset.</p>
+
+    <p>The threshold of 0.65 was chosen to minimize false positives. In financial KYC, a false positive (flagging a legitimate document as tampered) is worse than a false negative (missing a tampered document) because false positives cause customer friction and drop-off. We manually review any document that scores between 0.5 and 0.65 -- the "uncertain" zone.</p>
+
+    <h3>Stage 4: Live Transcription with Whisper</h3>
+
+    <p>The VKYC call is not just about documents. The agent asks the customer questions ("What is your date of birth?", "Can you confirm your address?") and the responses need to be transcribed for the audit trail. Indian regulations require a complete transcript of every KYC interaction.</p>
+
+    <p>We integrated OpenAI's Whisper model (the <code>base</code> variant, not <code>large</code>) for real-time speech-to-text. The choice of <code>base</code> over <code>large</code> was a latency decision: <code>large</code> gives ~3% better accuracy on our benchmark but takes 4x longer to transcribe. For a live call where the transcript appears in near-real-time, we cannot afford that latency.</p>
+
+    <p>The transcription runs on 5-second audio chunks streamed from the WebRTC call. Each chunk is processed independently, and we use a sliding window overlap of 1 second to avoid cutting words at chunk boundaries. The agent sees the transcript updating in their UI with about a 2-second delay, which feels natural during conversation.</p>
+
+    <p>The biggest challenge was handling Indian English accents and code-switching (customers switching between Hindi and English mid-sentence, which is extremely common in India). Whisper handles this surprisingly well because its training data includes a significant amount of Indian English. We measured 91.4% word accuracy on our test set of 500 VKYC call recordings, which was good enough for our use case. The transcript is supplementary -- the agent is on the live call and can correct any errors.</p>
+
+    <h2>The Architecture: How It All Fits Together</h2>
+
+    <p>The AI service is a Python FastAPI application running on GPU-equipped nodes. But it does not receive requests directly from the VKYC frontend. The architecture looks like this:</p>
+
+    <ol>
+      <li>Agent captures a document screenshot during the video call</li>
+      <li>The VKYC Node.js API receives the image and writes a job to a Redis Stream</li>
+      <li>The Go worker service (described in my <a href="scaling-with-golang.html">Go blog post</a>) picks up the job from the Redis Stream consumer group</li>
+      <li>The Go worker calls the Python AI service via gRPC with the image bytes</li>
+      <li>The Python AI service runs the full pipeline (preprocess, OCR, extract, validate, tamper check) and returns structured results</li>
+      <li>The Go worker writes the results to PostgreSQL and pushes a real-time update through the WebSocket to the agent's UI</li>
+    </ol>
+
+    <p>Why this architecture instead of having the Node.js API call the Python service directly? Three reasons:</p>
+
+    <p><strong>Decoupling.</strong> The video call should never be blocked by document processing. If the AI service is slow or down, the video call continues normally. The agent just sees "processing..." for longer. By going through a queue, we decouple the synchronous video call from the asynchronous document processing.</p>
+
+    <p><strong>Retry and reliability.</strong> Redis Streams consumer groups give us automatic retry via the pending entries list. If the Go worker crashes mid-processing, another worker picks up the message. If the Python AI service returns an error, the Go worker retries with exponential backoff. None of this retry logic needs to live in the Node.js API.</p>
+
+    <p><strong>Backpressure.</strong> During peak hours, we might get 50 document submissions in a minute. The Python AI service on a single GPU can process about 20 per minute. Without a queue, the excess requests would either timeout or overload the AI service. With Redis Streams, they queue up gracefully and get processed in order. We autoscale the Go workers (and indirectly the AI service) based on stream lag.</p>
+
+    <h2>The Numbers That Matter</h2>
+
+    <p>After 8 months in production, here are the metrics we track and the numbers we see:</p>
+
+    <ul>
+      <li><strong>OCR accuracy (field-level):</strong> 98.7% across PAN, Aadhaar, and address proof documents. Measured as: did we extract the correct value for each field (name, number, date of birth, address)?</li>
+      <li><strong>Tampering detection true positive rate:</strong> 94.2% on known-tampered documents in our fraud test set</li>
+      <li><strong>Tampering detection false positive rate:</strong> 1.8% -- meaning 1.8% of legitimate documents get flagged for manual review</li>
+      <li><strong>End-to-end latency (image received to results in UI):</strong> P50 = 3.2 seconds, P95 = 6.8 seconds, P99 = 9.1 seconds</li>
+      <li><strong>Whisper transcription accuracy:</strong> 91.4% word-level accuracy on Indian English</li>
+      <li><strong>Documents processed daily:</strong> ~2,500 on average, ~4,000 on peak days</li>
+      <li><strong>Throughput improvement vs manual review:</strong> 3x faster per document, with the agent freed to focus on the customer interaction rather than squinting at document details</li>
+    </ul>
+
+    <p>The 98.7% accuracy number is the one I am most proud of. When we started, we were at 87.3% with raw Tesseract OCR. Each improvement was incremental and hard-won:</p>
+
+    <ul>
+      <li>Switching from Tesseract to EasyOCR: 87.3% to 95.8% (+8.5 points)</li>
+      <li>Adding deskewing: 95.8% to 96.4% (+0.6 points)</li>
+      <li>Adding adaptive thresholding for low-contrast images: 96.4% to 97.1% (+0.7 points)</li>
+      <li>Adding perspective correction for angled photos: 97.1% to 97.9% (+0.8 points)</li>
+      <li>Training a custom field extraction model for PAN/Aadhaar layouts: 97.9% to 98.7% (+0.8 points)</li>
+    </ul>
+
+    <p>Each improvement required progressively more effort for diminishing returns. The first +8.5 points was a library swap (a day of work). The last +0.8 points required training a custom model on 5,000 annotated documents (three weeks of work). That is the nature of accuracy work -- the last few percentage points are exponentially harder.</p>
+
+    <h2>Lessons Learned</h2>
+
+    <p>After building and running this system in production, here is what I would do differently and what I would do the same:</p>
+
+    <p><strong>Invest in a labeled test set early.</strong> We did not create a proper evaluation dataset until month 3. Before that, we were eyeballing accuracy on random samples. The moment we had a labeled test set of 1,000 documents with ground truth annotations, our development velocity tripled because we could measure the impact of every change objectively. Build your test set before you build your pipeline.</p>
+
+    <p><strong>Preprocessing is the highest-ROI work.</strong> We spent weeks tuning OCR model parameters when a 30-line deskewing function gave us a bigger accuracy boost. The quality of your input determines the ceiling of your output. Always fix the input before tweaking the model.</p>
+
+    <p><strong>Run the AI service on CPU for development, GPU for production.</strong> Our CI/CD pipeline runs all tests on CPU (slower but no GPU dependency). Production runs on GPU (NVIDIA T4 instances). This means any engineer can run the full pipeline locally on their MacBook for development. If we had required GPU for development, iteration speed would have been much slower.</p>
+
+    <p><strong>Log everything, but redact PII.</strong> Every document processing job logs the input image hash, preprocessing steps applied, OCR confidence scores, field extraction results, and tampering check scores. But we never log the actual extracted data (names, numbers) in plain text -- it is always masked. This gives us full debuggability without compliance risk. When a document fails, we can trace exactly which stage failed and why, without ever seeing the customer's personal information in our logs.</p>
+
+    <p><strong>The Go worker + Python AI service split was the right call.</strong> Keeping the AI code in Python means our ML engineers work in their preferred language with the best library ecosystem (OpenCV, NumPy, PyTorch, Whisper). Keeping the orchestration in Go means the worker is fast, lightweight, and handles concurrency natively. The gRPC boundary between them is clean and well-defined. If we had written everything in Python, the worker would be a concurrency nightmare. If we had written everything in Go, the CV/ML code would be painful.</p>
+
+    <p><strong>Tampering detection is an arms race.</strong> Our detection catches amateur and intermediate-level fraud. Sophisticated fraud (high-quality document recreation) still gets through sometimes. We continuously update our detection models based on confirmed fraud cases. This is not a "build it and forget it" system -- it requires ongoing investment. We review every confirmed fraud case monthly and ask: "Would our system have caught this? If not, what signal did we miss?"</p>
+
+    <p>The VKYC AI pipeline is now one of the most business-critical services at Credit Saison. Every new customer who goes through video KYC has their documents processed by this system. It has cut our average KYC completion time from 12 minutes to 7 minutes, reduced manual document review by 80%, and caught 34 confirmed fraud attempts in its first 6 months of operation. Not bad for a system that started as a weekend prototype with Tesseract and a prayer.</p>
   </article>
 </main>
 
@@ -104,26 +305,12 @@
     <div class="footer-links">
       <a href="https://github.com/akgnitd" target="_blank" rel="noopener noreferrer">GitHub</a>
       <a href="https://linkedin.com/in/akgnitd" target="_blank" rel="noopener noreferrer">LinkedIn</a>
-      <!-- <a href="../resume.PDF" target="_blank" rel="noopener noreferrer">Resume</a> -->
+      <!-- <a href="../resume.pdf" target="_blank" rel="noopener noreferrer">Resume</a> -->
     </div>
   </div>
 </footer>
 
-<script>
-(function() {
-  const t = document.getElementById('themeToggle');
-  const s = localStorage.getItem('theme');
-  if (s) document.documentElement.setAttribute('data-theme', s);
-  t.addEventListener('click', () => { const n = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light'; document.documentElement.setAttribute('data-theme', n); localStorage.setItem('theme', n); });
-  const nb = document.getElementById('navbar');
-  window.addEventListener('scroll', () => nb.classList.toggle('scrolled', window.scrollY > 50), { passive: true });
-  const mt = document.getElementById('menuToggle'), nl = document.getElementById('navLinks'), ov = document.getElementById('mobileOverlay');
-  function cm() { nl.classList.remove('open'); mt.classList.remove('active'); ov.classList.remove('active'); }
-  mt.addEventListener('click', () => { const o = nl.classList.toggle('open'); mt.classList.toggle('active', o); ov.classList.toggle('active', o); });
-  ov.addEventListener('click', cm);
-  nl.querySelectorAll('a').forEach(l => l.addEventListener('click', cm));
-})();
-</script>
+<script src="../assets/js/main.js"></script>
 <script src="../assets/js/backgrounds.js"></script>
 </body>
 </html>

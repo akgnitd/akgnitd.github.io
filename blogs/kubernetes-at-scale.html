@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kubernetes at Scale: Lessons from Production — Atul Gupta</title>
+  <meta name="description" content="Hard-won lessons from running 50+ microservices on Kubernetes in production — from resource tuning to zero-downtime deployments." />
+
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="https://akgnitd.github.io/blogs/kubernetes-at-scale.html" />
+  <meta property="og:title" content="Kubernetes at Scale: Lessons from Production — Atul Gupta" />
+  <meta property="og:description" content="Hard-won lessons from running 50+ microservices on Kubernetes in production — from resource tuning to zero-downtime deployments." />
+  <meta property="og:image" content="https://akgnitd.github.io/assets/images/profile.jpg" />
+
+  <meta property="twitter:card" content="summary_large_image" />
+  <meta property="twitter:url" content="https://akgnitd.github.io/blogs/kubernetes-at-scale.html" />
+  <meta property="twitter:title" content="Kubernetes at Scale: Lessons from Production — Atul Gupta" />
+  <meta property="twitter:description" content="Hard-won lessons from running 50+ microservices on Kubernetes in production — from resource tuning to zero-downtime deployments." />
+  <meta property="twitter:image" content="https://akgnitd.github.io/assets/images/profile.jpg" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "Kubernetes at Scale: Lessons from Production",
+    "description": "Hard-won lessons from running 50+ microservices on Kubernetes in production — from resource tuning to zero-downtime deployments.",
+    "author": {
+      "@type": "Person",
+      "name": "Atul Gupta",
+      "url": "https://akgnitd.github.io/"
+    },
+    "datePublished": "2026-02-28",
+    "image": "https://akgnitd.github.io/assets/images/profile.jpg"
+  }
+  </script>
+
+  <meta name="theme-color" content="#05070a" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)" />
+  <link rel="icon" type="image/svg+xml" href="../assets/images/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="../assets/css/main.css" />
+</head>
+<body>
+
+<a href="#main" class="skip-to-content">Skip to main content</a>
+<div class="reading-progress" id="readingProgress"></div>
+<canvas id="bg-canvas" class="bg-canvas"></canvas>
+
+<nav class="navbar" id="navbar">
+  <div class="container">
+    <a href="../index.html" class="nav-logo">atul<span>.</span></a>
+    <div class="nav-links" id="navLinks">
+      <a href="../index.html#about">About</a>
+      <a href="../index.html#skills">Skills</a>
+      <a href="../index.html#projects">Projects</a>
+      <a href="../blog.html" class="active">Blog</a>
+      <a href="../index.html#contact">Contact</a>
+    </div>
+    <div class="nav-actions">
+      <button id="bgSwitcher" class="btn" style="padding: 0.5rem 0.9rem; margin-right: 0.5rem;" onclick="window.toggleBackgroundMode && window.toggleBackgroundMode()" title="Cycle Background Animation">🌍</button>
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark/light mode">
+        <span class="icon-moon">🌙</span>
+        <span class="icon-sun">☀️</span>
+      </button>
+      <button class="menu-toggle" id="menuToggle" aria-label="Open menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</nav>
+<div class="mobile-overlay" id="mobileOverlay"></div>
+
+<main id="main" class="blog-post-page">
+  <div class="blog-post-header">
+    <a href="../blog.html" class="back-link">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      Back to Blog
+    </a>
+    <p class="post-meta">February 28, 2026 · 24 min read</p>
+    <h1>Kubernetes at Scale: Lessons from Production</h1>
+  </div>
+
+  <article class="blog-post-content">
+    <p>It was 3:47 AM and my phone was buzzing with PagerDuty alerts. Our loan approval service was down. The VKYC platform was throwing 503s. The internal dashboard was unreachable. And the Slack channel was filling up with the dreaded words: "Is anyone looking at this?"</p>
+
+    <p>I opened my laptop, connected to the VPN, and pulled up Grafana. The graphs told the story: a single pod on one of our EKS nodes had hit its memory limit, got OOM-killed by the kernel, and restarted. Normal, right? Except this pod had no resource requests configured. So Kubernetes had scheduled it onto a node that was already running at 92% memory utilization. When the pod restarted, it consumed the remaining 8% almost instantly, which triggered the Linux OOM killer -- but this time, the OOM killer did not pick the offending pod. It picked the loan approval service running on the same node. That service went down, which caused a cascade of health check failures, which triggered Kubernetes to reschedule pods, which overloaded the remaining nodes, which triggered more OOM kills.</p>
+
+    <p>In 6 minutes, we went from "one pod is misbehaving" to "40% of our services are degraded." All because of a missing resource request on a single deployment manifest.</p>
+
+    <p>That incident was 18 months ago. Since then, we have scaled from a handful of services on ECS to <strong>50+ microservices on EKS</strong>, and every single lesson I am about to share was learned the hard way. This is not a Kubernetes tutorial. This is a field report from running Kubernetes in production at a financial services company where downtime means real money lost and real regulatory risk.</p>
+
+    <h2>Resource Requests: The Foundation of Everything</h2>
+
+    <p>Let me start with the fix for that 3 AM incident, because it illustrates the single most important operational practice in Kubernetes: resource requests and limits.</p>
+
+    <p>Here is what a properly configured deployment looks like for one of our Go services:</p>
+
+    <pre><code>apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vkyc-worker
+  namespace: vkyc
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: vkyc-worker
+  template:
+    metadata:
+      labels:
+        app: vkyc-worker
+    spec:
+      containers:
+      - name: worker
+        image: 123456789.dkr.ecr.ap-south-1.amazonaws.com/vkyc-worker:v2.4.1
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+        env:
+        - name: GOMAXPROCS
+          valueFrom:
+            resourceFieldRef:
+              resource: limits.cpu
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /livez
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          failureThreshold: 3</code></pre>
+
+    <p>A few things worth explaining:</p>
+
+    <p><strong>Requests vs limits.</strong> The request (250m CPU, 256Mi memory) is what the scheduler uses to decide where to place the pod. The limit (500m CPU, 512Mi memory) is the maximum the pod can use before it gets throttled (CPU) or killed (memory). The gap between request and limit is the "burst room" -- the pod normally runs within its request but can spike up to the limit during load.</p>
+
+    <p><strong>Why the 2x ratio?</strong> We found through experimentation that a 2x ratio between request and limit works well for most of our services. A 1:1 ratio (request equals limit, called "guaranteed QoS") wastes resources because you are reserving peak capacity even during idle periods. A 4x+ ratio is dangerous because it means the node can be heavily overcommitted -- every pod is requesting little but can consume a lot, leading to exactly the OOM cascade I described above.</p>
+
+    <p><strong>The GOMAXPROCS trick.</strong> Go's runtime defaults to using all available CPUs on the host, not the CPU limit of the container. On a 16-core node with a 500m CPU limit, Go would spin up 16 OS threads and compete for 0.5 cores, causing massive context switching. Setting <code>GOMAXPROCS</code> from the resource limit tells Go to use only the cores it has been allocated. This alone reduced CPU throttling by 60% across our Go services. (For Java services, the equivalent is the JVM's container-aware CPU detection, which is on by default since JDK 10.)</p>
+
+    <p><strong>Separate readiness and liveness probes.</strong> The readiness probe (<code>/healthz</code>) checks if the service is ready to receive traffic -- it verifies database connectivity, Redis connectivity, and that the warm-up is complete. The liveness probe (<code>/livez</code>) checks if the process is alive and not deadlocked -- it just returns 200 if the HTTP server is responsive. If you make the liveness probe check dependencies, a database outage will cause Kubernetes to restart your pods (they are alive but not ready), which makes things worse. This is a common and painful mistake.</p>
+
+    <h3>Enforcement with OPA Gatekeeper</h3>
+
+    <p>After the OOM cascade incident, we implemented an admission controller that rejects any deployment without resource requests. Here is the Gatekeeper constraint template:</p>
+
+    <pre><code>apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sRequiredResources
+metadata:
+  name: require-resource-requests
+spec:
+  match:
+    kinds:
+      - apiGroups: ["apps"]
+        kinds: ["Deployment", "StatefulSet", "DaemonSet"]
+    namespaces:
+      - "vkyc"
+      - "scalet"
+      - "lending"
+      - "platform"
+  parameters:
+    requiredResources:
+      - "cpu"
+      - "memory"
+    requireLimits: true
+    maxLimitRequestRatio:
+      cpu: 4
+      memory: 2</code></pre>
+
+    <p>The <code>maxLimitRequestRatio</code> is the secret sauce. It prevents teams from setting a tiny request with a huge limit (e.g., request 64Mi, limit 4Gi), which would allow extreme overcommitment. The CPU ratio is more generous (4x) because CPU throttling is non-fatal -- the pod just slows down. Memory ratio is stricter (2x) because exceeding the memory limit means OOM kill.</p>
+
+    <p>We also run <strong>Vertical Pod Autoscaler (VPA)</strong> in recommendation mode. VPA watches actual resource usage over time and suggests optimal request/limit values. It does not auto-apply changes (that can cause rolling restarts at inconvenient times) but it gives teams data-driven recommendations in a Grafana dashboard. About 35% of our services were over-provisioned (requesting 2-4x what they actually used) and 12% were under-provisioned (running close to their limits). VPA helped us right-size both.</p>
+
+    <h2>Zero-Downtime Deployments: Harder Than You Think</h2>
+
+    <p>Rolling updates in Kubernetes look straightforward: set <code>maxSurge: 1, maxUnavailable: 0</code> and Kubernetes will start a new pod before killing the old one. In practice, there is a race condition that causes dropped requests during deployments.</p>
+
+    <p>Here is what happens:</p>
+
+    <ol>
+      <li>Kubernetes sends SIGTERM to the old pod</li>
+      <li>The application starts graceful shutdown (stops accepting new connections, drains existing ones)</li>
+      <li>Meanwhile, kube-proxy and the ingress controller are updating their endpoint lists to remove the old pod</li>
+      <li>Steps 2 and 3 happen concurrently. For a brief window (typically 1-5 seconds), the endpoint list still contains the old pod, but the pod is already shutting down</li>
+      <li>Requests routed to the old pod during this window get connection refused errors</li>
+    </ol>
+
+    <p>The solution is a <code>preStop</code> lifecycle hook that delays the shutdown long enough for the endpoint list to be updated:</p>
+
+    <pre><code>spec:
+  containers:
+  - name: api
+    lifecycle:
+      preStop:
+        exec:
+          command:
+          - /bin/sh
+          - -c
+          - "sleep 5"
+    terminationGracePeriodSeconds: 30</code></pre>
+
+    <p>The <code>sleep 5</code> in the preStop hook runs <em>before</em> SIGTERM is sent to the application. During those 5 seconds, the endpoint controller removes the pod from the service endpoints. By the time SIGTERM arrives and the application starts shutting down, no new traffic is being routed to it.</p>
+
+    <p>The <code>terminationGracePeriodSeconds: 30</code> gives the application 25 seconds (30 minus the 5-second sleep) to drain in-flight requests after receiving SIGTERM. For our WebSocket services (Scalet), we set this to 60 seconds because WebSocket connections take longer to drain gracefully -- we send a close frame and wait for the client to acknowledge.</p>
+
+    <p>After implementing this across all 50+ services, we measured zero dropped requests during deployments over a 3-month period. Previously, every deployment caused a brief spike of 5-15 errors. That spike had been normalized as "deployment noise." It was not noise -- it was a bug.</p>
+
+    <h2>The OOM Cascade: A Real Incident Story</h2>
+
+    <p>I described the 3 AM incident at the top of this post, but let me give you the full post-mortem because it illustrates how small oversights compound in Kubernetes.</p>
+
+    <p><strong>Timeline:</strong></p>
+
+    <ul>
+      <li><strong>03:41</strong> -- A batch processing pod (document-indexer) exceeds its memory limit and gets OOM-killed. This pod had been deployed 3 days earlier by a new team member who forgot to add resource limits. The pod had been slowly leaking memory (a buffer that was not being released after batch processing).</li>
+      <li><strong>03:41</strong> -- Kubernetes restarts the pod on the same node. The restart happens fast (Go binary, 300ms startup), but the leak starts again.</li>
+      <li><strong>03:42</strong> -- The pod hits OOM again. The kubelet has now restarted it twice in 60 seconds, entering <code>CrashLoopBackOff</code>. But during each brief run, it consumed ~800Mi of memory.</li>
+      <li><strong>03:43</strong> -- Node memory pressure triggers. The kubelet starts evicting pods with the lowest priority and no guaranteed QoS. Three BestEffort pods (legacy services with no resource requests) are evicted.</li>
+      <li><strong>03:44</strong> -- The evicted pods get rescheduled onto other nodes, increasing memory pressure on those nodes. One of the nodes now runs our loan-approval service and 4 newly-rescheduled pods.</li>
+      <li><strong>03:45</strong> -- The loan-approval node hits 95% memory. The kernel OOM killer activates and kills the process with the highest OOM score -- which happens to be loan-approval because it has the largest memory footprint.</li>
+      <li><strong>03:46</strong> -- Loan-approval is down. Dependent services start failing health checks. The VKYC platform, which calls loan-approval for certain verification steps, starts returning 503s.</li>
+      <li><strong>03:47</strong> -- PagerDuty alerts fire. I wake up.</li>
+      <li><strong>03:52</strong> -- I identify the root cause (document-indexer CrashLoopBackOff consuming all node memory) and manually scale it to 0 replicas.</li>
+      <li><strong>03:55</strong> -- All services recover as pods get rescheduled onto now-available capacity.</li>
+    </ul>
+
+    <p><strong>Total impact:</strong> 12 minutes of partial outage affecting loan approvals and VKYC sessions. ~40 loan applications delayed. 3 VKYC sessions interrupted (customers had to restart).</p>
+
+    <p><strong>Root causes (plural, because incidents always have more than one):</strong></p>
+    <ol>
+      <li>The document-indexer had no resource limits (immediate cause)</li>
+      <li>The memory leak in the document-indexer was not caught in testing (contributing cause)</li>
+      <li>Several legacy services had no resource requests, making them BestEffort QoS and first in line for eviction (contributing cause)</li>
+      <li>We had no OPA policy preventing deployment of pods without resource limits (systemic cause)</li>
+      <li>We had no alerting on node memory pressure before it reached critical levels (detection gap)</li>
+    </ol>
+
+    <p><strong>Action items (all completed within 2 weeks):</strong></p>
+    <ol>
+      <li>Fix the memory leak in document-indexer</li>
+      <li>Add resource requests and limits to all 50+ services (done in a single PR with Helm chart defaults)</li>
+      <li>Deploy OPA Gatekeeper to reject deployments without resource definitions</li>
+      <li>Add Prometheus alerts for node memory pressure at 80% (warning) and 90% (critical)</li>
+      <li>Add Prometheus alerts for CrashLoopBackOff events</li>
+    </ol>
+
+    <p>This single incident drove more operational improvements than any planning session ever did. The best lessons are the ones that wake you up at 3 AM.</p>
+
+    <h2>Observability: The Three-Pillar Stack</h2>
+
+    <p>Kubernetes adds a layer of indirection between your application and the infrastructure. When something goes wrong, you need to answer: is it the app, the pod, the node, the network, or the cluster? Without proper observability, you are guessing.</p>
+
+    <p>We run a three-pillar observability stack:</p>
+
+    <h3>Metrics: Prometheus + Grafana</h3>
+
+    <p>Every service gets a standardized "golden signals" dashboard out of the box with four panels: latency (P50, P95, P99 histograms), traffic (requests per second), errors (4xx and 5xx rates), and saturation (CPU and memory utilization). This is Google's four golden signals, and they cover 90% of production issues.</p>
+
+    <p>We also have custom Prometheus alerting rules for the signals that matter most. Here is an example:</p>
+
+    <pre><code>groups:
+- name: golden-signals
+  rules:
+  # High error rate
+  - alert: HighErrorRate
+    expr: |
+      (
+        sum(rate(http_requests_total{status=~"5.."}[5m])) by (service)
+        /
+        sum(rate(http_requests_total[5m])) by (service)
+      ) > 0.05
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "{{ $labels.service }} has >5% error rate"
+      description: "Error rate is {{ $value | humanizePercentage }}"
+
+  # P99 latency spike
+  - alert: HighP99Latency
+    expr: |
+      histogram_quantile(0.99,
+        sum(rate(http_request_duration_seconds_bucket[5m]))
+        by (service, le)
+      ) > 2.0
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "{{ $labels.service }} P99 latency >2s"
+
+  # Pod CrashLoopBackOff (from the incident lesson)
+  - alert: PodCrashLooping
+    expr: |
+      increase(kube_pod_container_status_restarts_total[15m]) > 3
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Pod {{ $labels.pod }} is crash looping"
+
+  # Node memory pressure (early warning)
+  - alert: NodeMemoryPressure
+    expr: |
+      (
+        node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes
+      ) / node_memory_MemTotal_bytes > 0.80
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Node {{ $labels.instance }} memory >80%"</code></pre>
+
+    <p>The <code>PodCrashLooping</code> and <code>NodeMemoryPressure</code> alerts were added directly because of the OOM cascade incident. They have since fired 7 times, and every time we caught the issue before it cascaded. That is 7 potential 3 AM incidents prevented.</p>
+
+    <h3>Logs: Fluent Bit + ElasticSearch</h3>
+
+    <p>We use Fluent Bit as a DaemonSet to ship container logs to ElasticSearch. All services log in structured JSON format with mandatory fields: <code>timestamp</code>, <code>level</code>, <code>service</code>, <code>trace_id</code>, <code>message</code>. The <code>trace_id</code> is propagated across services using HTTP headers, so we can follow a single request from the API gateway through 5 internal services to the database.</p>
+
+    <h3>Traces: OpenTelemetry + Jaeger</h3>
+
+    <p>Distributed tracing was the single most impactful observability investment we made. When a VKYC session takes 12 seconds instead of the expected 5, a trace shows exactly where the time was spent: 200ms in the API gateway, 3ms in auth middleware, 8.5 seconds waiting for the AI service to process a document, 2.1 seconds in database writes, 1.2 seconds in WebSocket broadcast to the agent. Without tracing, we would be guessing. With tracing, we know the AI service is the bottleneck and can focus our optimization there.</p>
+
+    <h2>Karpenter: Intelligent Node Provisioning</h2>
+
+    <p>Before Karpenter, we used the Cluster Autoscaler with predefined node groups. This worked but was wasteful: we had a "general" node group (m5.xlarge), a "memory-optimized" node group (r5.xlarge), and a "compute-optimized" node group (c5.xlarge). When a pod needed 3 vCPU and 2GB RAM, it would get scheduled on a c5.xlarge (4 vCPU, 8GB), wasting 1 vCPU and 6GB. Cluster Autoscaler does not pick the optimal instance type -- it just scales the node group you configured.</p>
+
+    <p>Karpenter changes the model fundamentally. Instead of predefined node groups, you define a provisioner that describes constraints, and Karpenter selects the optimal instance type for the pending pods:</p>
+
+    <pre><code>apiVersion: karpenter.sh/v1alpha5
+kind: Provisioner
+metadata:
+  name: default
+spec:
+  requirements:
+    - key: "karpenter.sh/capacity-type"
+      operator: In
+      values: ["on-demand", "spot"]
+    - key: "node.kubernetes.io/instance-type"
+      operator: In
+      values:
+        - m5.large
+        - m5.xlarge
+        - m5.2xlarge
+        - c5.large
+        - c5.xlarge
+        - r5.large
+        - r5.xlarge
+        - m5a.large
+        - m5a.xlarge
+        - c5a.large
+        - c5a.xlarge
+    - key: "topology.kubernetes.io/zone"
+      operator: In
+      values:
+        - ap-south-1a
+        - ap-south-1b
+  limits:
+    resources:
+      cpu: "200"
+      memory: "400Gi"
+  ttlSecondsAfterEmpty: 30
+  ttlSecondsUntilExpired: 2592000  # 30 days
+  providerRef:
+    name: default
+---
+apiVersion: karpenter.k8s.aws/v1alpha1
+kind: AWSNodeTemplate
+metadata:
+  name: default
+spec:
+  subnetSelector:
+    karpenter.sh/discovery: "production-cluster"
+  securityGroupSelector:
+    karpenter.sh/discovery: "production-cluster"
+  blockDeviceMappings:
+    - deviceName: /dev/xvda
+      ebs:
+        volumeSize: 50Gi
+        volumeType: gp3
+        encrypted: true</code></pre>
+
+    <p>A few key design decisions:</p>
+
+    <p><strong>Mixed capacity types (on-demand + spot).</strong> Karpenter automatically uses spot instances when available and falls back to on-demand when spot capacity is unavailable. Our non-critical workloads (batch processing, staging environments) run on spot. Critical workloads (VKYC, loan approval) use node affinities to prefer on-demand nodes.</p>
+
+    <p><strong>Broad instance type list.</strong> We list 11 instance types across 3 families (m5, c5, r5) plus the AMD variants (m5a, c5a). Karpenter picks the cheapest instance type that satisfies the pending pod's resource requests. If spot capacity for m5.xlarge is unavailable, it tries c5a.xlarge instead. This flexibility reduces scheduling failures and cost.</p>
+
+    <p><strong><code>ttlSecondsAfterEmpty: 30</code>.</strong> If a node has no running pods for 30 seconds, Karpenter terminates it. This is aggressive but effective -- it prevents paying for idle nodes after a traffic drop. Combined with spot instances, this means our non-peak capacity scales down almost immediately.</p>
+
+    <p><strong><code>ttlSecondsUntilExpired: 2592000</code> (30 days).</strong> Karpenter will replace any node older than 30 days. This forces regular node rotation, which picks up new AMIs (with security patches), prevents long-running node state issues, and keeps the fleet fresh. It is the infrastructure equivalent of "have you tried turning it off and on again?" applied proactively.</p>
+
+    <h2>Cost Optimization: The Real Numbers</h2>
+
+    <p>Here is our actual cost breakdown before and after the optimizations I have described:</p>
+
+    <p><strong>Before (Month 1 on EKS, no optimization):</strong></p>
+    <ul>
+      <li>Compute (EC2): $18,200/month -- 100% on-demand, oversized instances, no autoscaling</li>
+      <li>EKS control plane: $73/month (fixed)</li>
+      <li>Load balancers (ALB): $420/month</li>
+      <li>Data transfer: $340/month</li>
+      <li>EBS volumes: $280/month</li>
+      <li><strong>Total: ~$19,300/month</strong></li>
+    </ul>
+
+    <p><strong>After (Current, fully optimized):</strong></p>
+    <ul>
+      <li>Compute (EC2): $7,800/month -- 40% spot, right-sized with VPA, Karpenter bin-packing</li>
+      <li>EKS control plane: $73/month (fixed)</li>
+      <li>Load balancers (ALB): $380/month (consolidated from 4 ALBs to 2 with path-based routing)</li>
+      <li>Data transfer: $290/month (cross-AZ transfer reduced by pod topology constraints)</li>
+      <li>EBS volumes: $190/month (switched from gp2 to gp3, reduced sizes based on actual usage)</li>
+      <li><strong>Total: ~$8,700/month</strong></li>
+    </ul>
+
+    <p><strong>Savings: $10,600/month (55% reduction), $127,200/year.</strong></p>
+
+    <p>The biggest wins by category:</p>
+    <ul>
+      <li><strong>Spot instances:</strong> ~$4,200/month saved. Non-critical workloads run on spot at 60-70% discount.</li>
+      <li><strong>Right-sizing (VPA recommendations):</strong> ~$3,100/month saved. 35% of services were over-provisioned by 2-4x.</li>
+      <li><strong>Karpenter bin-packing:</strong> ~$2,400/month saved. Karpenter selects optimal instance types and consolidates pods onto fewer, better-utilized nodes.</li>
+      <li><strong>Node scale-down (ttlSecondsAfterEmpty):</strong> ~$900/month saved. Idle nodes are terminated within 30 seconds instead of lingering for hours.</li>
+    </ul>
+
+    <p>We track cost per team using Kubecost, which breaks down Kubernetes costs by namespace. Each team has a monthly cost budget, and Kubecost sends Slack alerts when a team exceeds 80% of their budget. This creates accountability without requiring teams to be cloud cost experts.</p>
+
+    <h2>The Platform Team Golden Path</h2>
+
+    <p>The biggest mistake I made in our Kubernetes journey was not investing in a platform team from day one. For the first 6 months, every team managed their own Kubernetes manifests. The result: 50+ services, each with slightly different deployment configurations, different health check patterns, different logging formats, different resource configurations. When we wanted to make a cluster-wide change (like adding the preStop hook for zero-downtime deployments), we had to modify 50+ repositories.</p>
+
+    <p>We now have a 3-person platform team that maintains a standardized Helm chart -- our "golden path" -- that every service uses:</p>
+
+    <pre><code># values.yaml -- what teams actually configure
+service:
+  name: vkyc-worker
+  team: vkyc
+  tier: critical  # determines resource defaults, PDB, etc.
+
+image:
+  repository: 123456789.dkr.ecr.ap-south-1.amazonaws.com/vkyc-worker
+  tag: v2.4.1
+
+resources:
+  # Teams only set these if different from tier defaults
+  requests:
+    cpu: "250m"
+    memory: "256Mi"
+
+replicas:
+  min: 3
+  max: 10
+
+autoscaling:
+  enabled: true
+  targetCPU: 70
+
+ports:
+  - name: http
+    containerPort: 8080
+
+healthCheck:
+  readiness:
+    path: /healthz
+  liveness:
+    path: /livez
+
+env:
+  - name: REDIS_URL
+    valueFrom:
+      secretKeyRef:
+        name: vkyc-secrets
+        key: redis-url</code></pre>
+
+    <p>The golden path Helm chart handles everything that teams should not have to think about:</p>
+
+    <ul>
+      <li><strong>preStop hooks</strong> -- automatically added based on the <code>tier</code> (critical services get a 10-second sleep, standard services get 5 seconds)</li>
+      <li><strong>PodDisruptionBudgets</strong> -- automatically created for critical-tier services (minAvailable: 1)</li>
+      <li><strong>Resource defaults</strong> -- each tier has sensible defaults so teams do not have to research instance sizing</li>
+      <li><strong>Prometheus annotations</strong> -- scrape configuration is automatic for any service exposing a <code>/metrics</code> endpoint</li>
+      <li><strong>Network policies</strong> -- namespace-scoped by default, with explicit exceptions for cross-namespace communication</li>
+      <li><strong>SecurityContext</strong> -- non-root user, read-only filesystem, dropped capabilities. Security by default, not by exception.</li>
+    </ul>
+
+    <p>The result: deploying a new service takes about 15 minutes of configuration (writing a values.yaml file) instead of 2-3 hours of writing raw Kubernetes manifests. And when we need to make a cluster-wide change, we update the golden path chart once and every service gets the change on their next deployment.</p>
+
+    <h2>Lessons Learned: The Hard-Won Wisdom</h2>
+
+    <p>After 18 months of running 50+ microservices on EKS, here are the lessons I would give to anyone starting the same journey:</p>
+
+    <p><strong>1. Resource requests are the most important configuration in your cluster.</strong> Get them wrong and everything else -- scheduling, autoscaling, cost optimization, stability -- falls apart. Invest in VPA, enforce policies, review resource utilization monthly.</p>
+
+    <p><strong>2. Your first production incident will be about missing basics.</strong> Not service mesh configuration or custom operators. It will be a missing readiness probe, a missing resource request, or a missing preStop hook. Get the basics right before you get fancy.</p>
+
+    <p><strong>3. Observability is not optional.</strong> You cannot operate what you cannot see. Metrics, logs, and traces are the three legs of the stool. If any one is missing, you are guessing during incidents. Invest in structured logging and distributed tracing early -- retrofitting them is painful.</p>
+
+    <p><strong>4. A platform team pays for itself within 3 months.</strong> The productivity gains from standardized golden paths, self-service tooling, and cluster-wide operational improvements are enormous. If you have more than 10 services, you need a platform team.</p>
+
+    <p><strong>5. Spot instances are free money (for the right workloads).</strong> Batch processing, staging environments, CI/CD runners, and stateless non-critical services are excellent spot candidates. Do not run your primary database or payment processing on spot. The 60-70% savings add up fast.</p>
+
+    <p><strong>6. Every incident is a gift.</strong> The OOM cascade taught us more about Kubernetes operations than any training course. Every incident post-mortem produces action items that make the platform more resilient. Embrace incidents as learning opportunities, not failures. The only failure is not learning from them.</p>
+
+    <p><strong>7. Kubernetes is a platform for building platforms.</strong> Using raw Kubernetes is like programming in assembly. You <em>can</em> do it, and sometimes you need to. But for most teams, you want an abstraction layer on top (the golden path) that hides the complexity and provides sensible defaults. Kubernetes is the tool your platform team uses. The golden path is the tool your product teams use.</p>
+
+    <p><strong>8. Cost optimization is continuous, not a one-time project.</strong> We review cluster costs monthly. New services get deployed, traffic patterns change, instance pricing changes. The $127K/year in savings we achieved required ongoing attention, not a single optimization sprint.</p>
+
+    <p>Kubernetes is powerful, complex, and unforgiving of operational sloppiness. But when you build the right practices around it -- resource governance, observability, platform abstraction, cost discipline -- it enables a velocity and reliability that is hard to achieve any other way. Our 50+ services deploy an average of 12 times per day with zero downtime and sub-5-minute incident detection. That was unthinkable when we were on ECS.</p>
+
+    <p>The real work of Kubernetes is not in the YAML. It is in the operational culture you build around the YAML. Get that right, and the platform takes care of itself. Get it wrong, and you will be joining me at 3:47 AM, staring at a cascading failure and wondering where it all went wrong.</p>
+  </article>
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-left"><p>&copy; 2026 Atul Gupta.</p></div>
+    <div class="footer-links">
+      <a href="https://github.com/akgnitd" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <a href="https://linkedin.com/in/akgnitd" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../assets/js/main.js"></script>
+<script src="../assets/js/backgrounds.js"></script>
+</body>
+</html>

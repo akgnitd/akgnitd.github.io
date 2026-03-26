@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Redis Streams for Distributed Job Processing — Atul Gupta</title>
+  <meta name="description" content="Using Redis Streams with consumer groups for reliable background job processing — from OCR pipelines to webhook delivery." />
+
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="https://akgnitd.github.io/blogs/redis-streams-distributed-jobs.html" />
+  <meta property="og:title" content="Redis Streams for Distributed Job Processing — Atul Gupta" />
+  <meta property="og:description" content="Using Redis Streams with consumer groups for reliable background job processing — from OCR pipelines to webhook delivery." />
+  <meta property="og:image" content="https://akgnitd.github.io/assets/images/profile.jpg" />
+
+  <meta property="twitter:card" content="summary_large_image" />
+  <meta property="twitter:url" content="https://akgnitd.github.io/blogs/redis-streams-distributed-jobs.html" />
+  <meta property="twitter:title" content="Redis Streams for Distributed Job Processing — Atul Gupta" />
+  <meta property="twitter:description" content="Using Redis Streams with consumer groups for reliable background job processing — from OCR pipelines to webhook delivery." />
+  <meta property="twitter:image" content="https://akgnitd.github.io/assets/images/profile.jpg" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "Redis Streams for Distributed Job Processing",
+    "description": "Using Redis Streams with consumer groups for reliable background job processing — from OCR pipelines to webhook delivery.",
+    "author": {
+      "@type": "Person",
+      "name": "Atul Gupta",
+      "url": "https://akgnitd.github.io/"
+    },
+    "datePublished": "2026-01-28",
+    "image": "https://akgnitd.github.io/assets/images/profile.jpg"
+  }
+  </script>
+
+  <meta name="theme-color" content="#05070a" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)" />
+  <link rel="icon" type="image/svg+xml" href="../assets/images/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="../assets/css/main.css" />
+</head>
+<body>
+
+<a href="#main" class="skip-to-content">Skip to main content</a>
+<div class="reading-progress" id="readingProgress"></div>
+<canvas id="bg-canvas" class="bg-canvas"></canvas>
+
+<nav class="navbar" id="navbar">
+  <div class="container">
+    <a href="../index.html" class="nav-logo">atul<span>.</span></a>
+    <div class="nav-links" id="navLinks">
+      <a href="../index.html#about">About</a>
+      <a href="../index.html#skills">Skills</a>
+      <a href="../index.html#projects">Projects</a>
+      <a href="../blog.html" class="active">Blog</a>
+      <a href="../index.html#contact">Contact</a>
+    </div>
+    <div class="nav-actions">
+      <button id="bgSwitcher" class="btn" style="padding: 0.5rem 0.9rem; margin-right: 0.5rem;" onclick="window.toggleBackgroundMode && window.toggleBackgroundMode()" title="Cycle Background Animation">🌍</button>
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark/light mode">
+        <span class="icon-moon">🌙</span>
+        <span class="icon-sun">☀️</span>
+      </button>
+      <button class="menu-toggle" id="menuToggle" aria-label="Open menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</nav>
+<div class="mobile-overlay" id="mobileOverlay"></div>
+
+<main id="main" class="blog-post-page">
+  <div class="blog-post-header">
+    <a href="../blog.html" class="back-link">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      Back to Blog
+    </a>
+    <p class="post-meta">January 28, 2026 · 18 min read</p>
+    <h1>Redis Streams for Distributed Job Processing</h1>
+  </div>
+
+  <article class="blog-post-content">
+    <p>Across three different production services, we use Redis for background job processing -- but each service uses a different Redis consumption pattern based on its specific requirements. The <strong>VKYC service</strong> (Go) uses Redis Streams with XREADGROUP and XAUTOCLAIM for document OCR processing. The <strong>engage-flow service</strong> (Java Spring) uses Spring's StreamMessageListenerContainer for workflow event processing. The <strong>connector-service</strong> (Go) uses the simpler BLPop pattern for webhook delivery. This post is a deep comparison of all three patterns, drawn from real production code, with honest assessments of when each pattern is the right choice.</p>
+
+    <h2>Why Redis Over Kafka or SQS</h2>
+    <p>Before comparing Redis patterns, it is worth explaining why Redis at all. <strong>Kafka</strong> is the gold standard for high-throughput event streaming. It handles millions of messages per second with replicated, durable commit logs. But Kafka requires dedicated infrastructure: ZooKeeper (or KRaft), broker clusters, topic partition management, and at least one engineer who understands Kafka operations. For our workload of 10,000-50,000 jobs per day across all three services, Kafka is like renting a freight container to ship a shoebox.</p>
+    <p><strong>SQS</strong> eliminates the operational burden but introduces other limitations: no consumer groups (fan-out requires multiple queues or SNS), no message replay, 256KB message size limit, and you pay per API call. More importantly, SQS adds network latency for every enqueue/dequeue operation since it is a remote AWS service. Our Redis instances are co-located with our application servers, giving us sub-millisecond enqueue/dequeue latency.</p>
+    <p><strong>Redis</strong> was already in our stack for caching, session storage, and rate limiting. Using it for job processing means no new infrastructure, no new operational runbooks, no new monitoring stack. Redis Streams provide append-only log semantics (conceptually similar to Kafka topics), consumer groups for distributed processing, message acknowledgement for at-least-once delivery, and the ability to inspect pending messages and claim stale ones. The trade-off is durability: Redis persistence (RDB snapshots every 60 seconds, AOF with everysec fsync) is not as robust as Kafka's replicated commit log. For our use cases, losing a few in-flight jobs on a Redis crash is acceptable because all our processors are idempotent and we run a reconciliation job that catches gaps.</p>
+
+    <h2>Pattern 1: Go XREADGROUP + XAUTOCLAIM (VKYC Service)</h2>
+    <p>The VKYC service processes document verification jobs: when a customer uploads an Aadhaar card, PAN card, or bank statement during a Video KYC session, the image is stored in S3 and a job is enqueued to a Redis Stream for OCR extraction and document verification. Here is the core consumption loop from the Go worker:</p>
+    <pre><code>func (w *Worker) processDocumentJobs(ctx context.Context) error {
+    for {
+        select {
+        case &lt;-ctx.Done():
+            return ctx.Err()
+        default:
+        }
+
+        // Step 1: Read new messages from the stream
+        streams, err := w.redis.XReadGroup(ctx, &amp;redis.XReadGroupArgs{
+            Group:    documentConsumerGroup,
+            Consumer: w.cfg.consumerName,
+            Streams:  []string{documentJobStreamKey, "&gt;"},
+            Count:    maxReadCount,
+            Block:    readBlockTimeout,
+        }).Result()
+
+        if err != nil {
+            if err == redis.Nil {
+                continue // No new messages, loop back to block again
+            }
+            w.logger.Error("xreadgroup failed", zap.Error(err))
+            time.Sleep(errorBackoff)
+            continue
+        }
+
+        for _, stream := range streams {
+            for _, message := range stream.Messages {
+                if err := w.handleDocumentJob(ctx, message); err != nil {
+                    w.logger.Error("job processing failed",
+                        zap.String("message_id", message.ID),
+                        zap.Error(err),
+                    )
+                    // Don't ACK - message stays in PEL for retry/claim
+                    continue
+                }
+
+                // ACK on success
+                w.redis.XAck(ctx, documentJobStreamKey, documentConsumerGroup, message.ID)
+            }
+        }
+    }
+}</code></pre>
+    <p>The <code>"&gt;"</code> special ID in the Streams argument tells Redis to deliver only messages that have never been delivered to any consumer in this group. <code>Count: maxReadCount</code> (set to 10) limits how many messages we process per iteration, preventing a single worker from grabbing too many jobs during a burst. <code>Block: readBlockTimeout</code> (set to 5 seconds) makes the call block until either messages are available or the timeout expires, avoiding a tight polling loop that would waste CPU.</p>
+    <p>The critical design decision is on the error path: when <code>handleDocumentJob</code> fails, we do <strong>not</strong> acknowledge the message. It remains in the consumer's Pending Entries List (PEL). This is the foundation of at-least-once delivery: unacknowledged messages are retried.</p>
+
+    <h3>Claiming Stale Messages with XAUTOCLAIM</h3>
+    <p>If a worker crashes mid-processing, its pending messages are orphaned in the PEL. No other consumer will receive them because Redis tracks that they were already delivered. This is where XAUTOCLAIM comes in. We run a separate goroutine that periodically claims stale messages:</p>
+    <pre><code>func (w *Worker) claimStaleMessages(ctx context.Context) {
+    ticker := time.NewTicker(staleClaimInterval) // 30 seconds
+    defer ticker.Stop()
+
+    for {
+        select {
+        case &lt;-ctx.Done():
+            return
+        case &lt;-ticker.C:
+            messages, _, err := w.redis.XAutoClaim(ctx, &amp;redis.XAutoClaimArgs{
+                Stream:   documentJobStreamKey,
+                Group:    documentConsumerGroup,
+                Consumer: w.cfg.consumerName,
+                MinIdle:  staleMessageThreshold, // 5 minutes
+                Count:    maxClaimCount,          // 20
+                Start:    "0-0",
+            }).Result()
+
+            if err != nil {
+                w.logger.Error("xautoclaim failed", zap.Error(err))
+                continue
+            }
+
+            for _, message := range messages {
+                deliveryCount, _ := w.getDeliveryCount(ctx, message.ID)
+                if deliveryCount &gt; maxRetries { // maxRetries = 3
+                    w.moveToDeadLetter(ctx, message)
+                    w.redis.XAck(ctx, documentJobStreamKey, documentConsumerGroup, message.ID)
+                    continue
+                }
+
+                if err := w.handleDocumentJob(ctx, message); err != nil {
+                    w.logger.Warn("stale message reprocessing failed",
+                        zap.String("message_id", message.ID),
+                        zap.Int("delivery_count", deliveryCount),
+                        zap.Error(err),
+                    )
+                    continue
+                }
+
+                w.redis.XAck(ctx, documentJobStreamKey, documentConsumerGroup, message.ID)
+            }
+        }
+    }
+}</code></pre>
+    <p><code>XAUTOCLAIM</code> is a Redis 6.2+ command that combines XPENDING + XCLAIM into a single atomic operation. It finds messages in the PEL that have been idle for longer than <code>MinIdle</code> (5 minutes) and transfers ownership to the calling consumer. The <code>Start: "0-0"</code> means scan from the beginning of the PEL.</p>
+    <p>The delivery count check is our dead letter logic. Redis tracks how many times a message has been delivered (incremented each time it is read or claimed). If a message has been delivered more than 3 times and still not acknowledged, it is a poison pill -- probably malformed input that will never process successfully. We move it to a dead letter stream and ACK it from the main stream to prevent infinite retries.</p>
+
+    <h3>Dead Letter Handling</h3>
+    <pre><code>func (w *Worker) moveToDeadLetter(ctx context.Context, message redis.XMessage) {
+    dlqEntry := map[string]interface{}{
+        "original_stream":  documentJobStreamKey,
+        "original_id":      message.ID,
+        "consumer_group":   documentConsumerGroup,
+        "failed_consumer":  w.cfg.consumerName,
+        "failure_time":     time.Now().UTC().Format(time.RFC3339),
+        "payload":          message.Values,
+    }
+
+    w.redis.XAdd(ctx, &amp;redis.XAddArgs{
+        Stream: documentJobStreamKey + ":dlq",
+        Values: dlqEntry,
+    })
+
+    w.metrics.IncrCounter("document_jobs_dead_lettered", 1)
+    w.logger.Error("message moved to DLQ",
+        zap.String("message_id", message.ID),
+        zap.Any("payload", message.Values),
+    )
+}</code></pre>
+    <p>The dead letter stream (<code>document-jobs:dlq</code>) preserves the original message payload along with diagnostic metadata: which stream it came from, which consumer failed on it, and when. We have an admin API that lists DLQ entries and allows one-click reprocessing (which XADDs the payload back to the original stream).</p>
+
+    <h2>Pattern 2: Java Spring StreamMessageListenerContainer (engage-flow)</h2>
+    <p>The engage-flow service processes workflow events: when a customer action triggers a marketing flow (e.g., "abandoned cart -> send email after 30 minutes -> if not opened, send push notification"), the event is enqueued to a Redis Stream and processed by Spring's built-in stream listener infrastructure. This pattern is more declarative than the Go approach:</p>
+    <pre><code>@Configuration
+public class RedisStreamConfig {
+
+    @Bean
+    public StreamMessageListenerContainer&lt;String, MapRecord&lt;String, String, String&gt;&gt;
+            listenerContainer(RedisConnectionFactory connectionFactory,
+                              RedisMessageHandler redisMessageHandler) {
+
+        var options = StreamMessageListenerContainer
+            .StreamMessageListenerContainerOptions.builder()
+            .pollTimeout(Duration.ofSeconds(5))
+            .batchSize(10)
+            .targetType(MapRecord.class)
+            .errorHandler(e -&gt; log.error("Stream listener error", e))
+            .build();
+
+        var listenerContainer = StreamMessageListenerContainer
+            .create(connectionFactory, options);
+
+        String consumerGroup = appConfig.getConsumerGroup();
+        String consumerName = appConfig.getConsumerName();
+        String streamKey = appConfig.getStreamKey();
+
+        // Ensure consumer group exists
+        try {
+            connectionFactory.getConnection().streamCommands()
+                .xGroupCreate(streamKey.getBytes(), consumerGroup, ReadOffset.latest(), true);
+        } catch (Exception e) {
+            // Group already exists - this is fine
+        }
+
+        listenerContainer.receive(
+            Consumer.from(consumerGroup, consumerName),
+            StreamOffset.create(streamKey, ReadOffset.lastConsumed()),
+            message -&gt; {
+                try {
+                    redisMessageHandler.handleRedisMessage(message.getValue());
+                    // Auto-ACK on successful processing
+                    connectionFactory.getConnection().streamCommands()
+                        .xAck(streamKey.getBytes(), consumerGroup,
+                               message.getId().getValue().getBytes());
+                } catch (Exception e) {
+                    log.error("Failed to process message: {}", message.getId(), e);
+                    // Don't ACK - message stays in PEL
+                }
+            }
+        );
+
+        listenerContainer.start();
+        return listenerContainer;
+    }
+}</code></pre>
+    <p>Spring's <code>StreamMessageListenerContainer</code> abstracts away the XREADGROUP loop, the blocking, and the thread management. You configure poll timeout (equivalent to the Block parameter), batch size (equivalent to Count), and provide a message handler lambda. Under the hood, it runs a polling loop in a dedicated thread that calls XREADGROUP with the configured parameters.</p>
+    <p>The <code>ReadOffset.lastConsumed()</code> tells the container to read from the last consumed position, which translates to the <code>"&gt;"</code> special ID in XREADGROUP. If the consumer restarts, it picks up from where it left off thanks to Redis tracking the group's cursor position.</p>
+    <p>The trade-off compared to the Go approach is flexibility. Spring's container does not natively support XAUTOCLAIM for stale message recovery. We handle this with a separate scheduled task:</p>
+    <pre><code>@Scheduled(fixedRate = 60_000) // Every 60 seconds
+public void claimStaleMessages() {
+    StringRedisSerializer serializer = new StringRedisSerializer();
+
+    // XPENDING to find stale messages
+    PendingMessages pending = redisTemplate.opsForStream()
+        .pending(streamKey, consumerGroup, Range.unbounded(), 50);
+
+    for (PendingMessage pm : pending) {
+        if (pm.getElapsedTimeSinceLastDelivery().compareTo(Duration.ofMinutes(5)) &gt; 0
+                &amp;&amp; pm.getTotalDeliveryCount() &lt;= 3) {
+
+            // XCLAIM the stale message
+            List&lt;MapRecord&lt;String, Object, Object&gt;&gt; claimed =
+                redisTemplate.opsForStream().claim(
+                    streamKey, consumerGroup, consumerName,
+                    Duration.ofMinutes(5), RecordId.of(pm.getIdAsString()));
+
+            for (var record : claimed) {
+                try {
+                    redisMessageHandler.handleRedisMessage(
+                        (Map&lt;String, String&gt;) (Map) record.getValue());
+                    redisTemplate.opsForStream()
+                        .acknowledge(streamKey, consumerGroup, record.getId());
+                } catch (Exception e) {
+                    log.error("Stale message reprocessing failed: {}", record.getId(), e);
+                }
+            }
+        } else if (pm.getTotalDeliveryCount() &gt; 3) {
+            moveToDeadLetter(pm);
+        }
+    }
+}</code></pre>
+
+    <h2>Pattern 3: Go BLPop Queue (connector-service)</h2>
+    <p>The connector-service handles webhook delivery to partner systems. Unlike document processing (which requires consumer groups for distributed load balancing), webhook delivery has a simpler requirement: pick up a job, deliver the webhook, mark it done. We use the BLPop pattern, which is Redis's simplest queue primitive:</p>
+    <pre><code>func (r *RedisQueue) ConsumeJobs(ctx context.Context, queue string, handler JobHandler) error {
+    for {
+        select {
+        case &lt;-ctx.Done():
+            return ctx.Err()
+        default:
+        }
+
+        result, err := r.RedisClient.BLPop(ctx, 5*time.Second, queue).Result()
+        if err != nil {
+            if err == redis.Nil {
+                continue // Timeout, no messages available
+            }
+            r.logger.Error("blpop failed", zap.String("queue", queue), zap.Error(err))
+            time.Sleep(time.Second)
+            continue
+        }
+
+        // result[0] is the queue name, result[1] is the payload
+        payload := result[1]
+
+        var job WebhookJob
+        if err := json.Unmarshal([]byte(payload), &amp;job); err != nil {
+            r.logger.Error("invalid job payload",
+                zap.String("payload", payload),
+                zap.Error(err),
+            )
+            continue // Malformed payload, skip
+        }
+
+        if err := handler.Handle(ctx, &amp;job); err != nil {
+            r.logger.Error("job handling failed",
+                zap.String("job_id", job.ID),
+                zap.Error(err),
+            )
+            r.handleRetry(ctx, queue, &amp;job, err)
+            continue
+        }
+
+        r.metrics.IncrCounter("webhooks_delivered", 1)
+    }
+}</code></pre>
+    <p><code>BLPop</code> is a blocking left-pop: it removes and returns the first element of the list, blocking for up to 5 seconds if the list is empty. The producer enqueues jobs with <code>RPush</code>, creating a FIFO queue. This is the simplest possible queue pattern in Redis -- no consumer groups, no message IDs, no ACK mechanism.</p>
+    <p>The simplicity is both the strength and the limitation. <code>BLPop</code> removes the message from the list atomically, so there is no risk of duplicate delivery (unlike Streams where you must ACK). But if the consumer crashes after popping the message but before completing the webhook delivery, the message is lost. For our webhook use case, this is acceptable because:</p>
+    <p>1. The webhook job is also recorded in PostgreSQL with a status of "pending." A reconciliation cron job runs every 5 minutes and re-enqueues any job that has been "pending" for longer than 2 minutes. This catches any jobs lost to consumer crashes.</p>
+    <p>2. Webhook delivery is inherently idempotent from the receiver's perspective (our payloads include a unique event ID that receivers use for deduplication).</p>
+
+    <h3>Retry with Exponential Backoff</h3>
+    <pre><code>func (r *RedisQueue) handleRetry(ctx context.Context, queue string, job *WebhookJob, jobErr error) {
+    job.RetryCount++
+    job.LastError = jobErr.Error()
+    job.LastAttempt = time.Now().UTC()
+
+    if job.RetryCount &gt; maxRetries { // maxRetries = 5
+        r.logger.Error("max retries exceeded, moving to DLQ",
+            zap.String("job_id", job.ID),
+            zap.Int("retry_count", job.RetryCount),
+        )
+        r.moveToDeadLetter(ctx, job)
+        return
+    }
+
+    // Exponential backoff: 30s, 2m, 8m, 30m, 2h
+    backoffDurations := []time.Duration{
+        30 * time.Second,
+        2 * time.Minute,
+        8 * time.Minute,
+        30 * time.Minute,
+        2 * time.Hour,
+    }
+    delay := backoffDurations[job.RetryCount-1]
+    job.RetryAfter = time.Now().Add(delay)
+
+    // Schedule retry using a sorted set as a delay queue
+    payload, _ := json.Marshal(job)
+    r.RedisClient.ZAdd(ctx, queue+":delayed", &amp;redis.Z{
+        Score:  float64(job.RetryAfter.Unix()),
+        Member: string(payload),
+    })
+}
+
+// Separate goroutine promotes delayed jobs back to the main queue
+func (r *RedisQueue) promoteDelayedJobs(ctx context.Context, queue string) {
+    ticker := time.NewTicker(5 * time.Second)
+    defer ticker.Stop()
+
+    for {
+        select {
+        case &lt;-ctx.Done():
+            return
+        case &lt;-ticker.C:
+            now := float64(time.Now().Unix())
+            jobs, err := r.RedisClient.ZRangeByScore(ctx, queue+":delayed", &amp;redis.ZRangeBy{
+                Min: "-inf",
+                Max: fmt.Sprintf("%f", now),
+            }).Result()
+            if err != nil {
+                continue
+            }
+
+            for _, jobPayload := range jobs {
+                // Atomically move from delayed set to main queue
+                r.RedisClient.ZRem(ctx, queue+":delayed", jobPayload)
+                r.RedisClient.RPush(ctx, queue, jobPayload)
+            }
+        }
+    }
+}</code></pre>
+    <p>The retry mechanism uses a Redis sorted set as a delay queue. Failed jobs are added to the sorted set with their <code>RetryAfter</code> timestamp as the score. A background goroutine polls the sorted set every 5 seconds, finds all jobs whose score (retry time) is in the past, and promotes them back to the main BLPop queue. This gives us exponential backoff without blocking the main consumer loop.</p>
+    <p>The backoff schedule (30s, 2m, 8m, 30m, 2h) was tuned for webhook delivery. Most transient failures (target server overloaded, temporary DNS issues) resolve within minutes. The escalating delays prevent hammering a struggling endpoint while still ensuring timely delivery once it recovers. After 5 retries spanning approximately 2.5 hours, the job moves to the dead letter queue.</p>
+
+    <h2>Comparing the Three Patterns</h2>
+    <p>Here is how the three patterns compare across key dimensions:</p>
+    <pre><code>                    | Streams + XREADGROUP    | Spring Listener         | BLPop
+--------------------|-------------------------|-------------------------|------------------
+Delivery guarantee  | At-least-once           | At-least-once           | At-most-once*
+Consumer groups     | Native                  | Native (via Spring)     | None (1 consumer/queue)
+Message ordering    | Per-stream FIFO         | Per-stream FIFO         | Strict FIFO
+Stale msg recovery  | XAUTOCLAIM              | XPENDING + XCLAIM       | N/A (msg is gone)
+Dead letter         | Manual (DLQ stream)     | Manual (scheduled)      | Manual (sorted set)
+Complexity          | Medium                  | Low (framework managed) | Low
+Message visibility  | Full (XRANGE, XINFO)    | Full                    | None after pop
+Replay capability   | Yes (reset group pos)   | Yes                     | No
+
+* BLPop is at-most-once from Redis's perspective. We achieve
+  at-least-once via the PostgreSQL reconciliation job.</code></pre>
+    <p><strong>Use Streams + XREADGROUP</strong> when you need multiple consumers processing the same stream in parallel (consumer groups), when message visibility and replay are important, and when you want Redis to handle the delivery tracking. This is the right choice for our document processing pipeline where jobs are long-running (3-8 seconds), failures must be retried automatically, and we need to inspect the pending state during debugging.</p>
+    <p><strong>Use Spring StreamMessageListenerContainer</strong> when you are in the Java/Spring ecosystem and want the framework to manage the polling loop, threading, and error handling. It reduces boilerplate significantly at the cost of some flexibility (no native XAUTOCLAIM support, less control over the read loop). This is our choice for engage-flow because the team is Java-centric and the Spring abstraction aligns with the existing codebase patterns.</p>
+    <p><strong>Use BLPop</strong> when simplicity is paramount, when you have a separate durability mechanism (like our PostgreSQL reconciliation), and when consumer groups are not needed. The connector-service uses a single consumer per queue, and the at-most-once semantics are acceptable because the reconciliation job covers the gap. BLPop's biggest advantage is that it is trivial to understand: push on one end, pop on the other. There is no consumer group state, no PEL, no claiming -- just a list.</p>
+
+    <h2>Monitoring Stream Lag</h2>
+    <p>Regardless of which pattern you use, monitoring is essential. We scrape the following metrics from Redis every 30 seconds via a Prometheus exporter:</p>
+    <pre><code>// For Redis Streams (VKYC, engage-flow)
+func (m *Monitor) collectStreamMetrics(ctx context.Context, streamKey string, group string) {
+    // Stream length: total messages in the stream
+    length, _ := m.redis.XLen(ctx, streamKey).Result()
+    m.gauge.Set("redis_stream_length", float64(length), streamKey)
+
+    // Pending count: unacknowledged messages in the consumer group
+    pending, _ := m.redis.XPending(ctx, streamKey, group).Result()
+    m.gauge.Set("redis_stream_pending", float64(pending.Count), streamKey, group)
+
+    // Per-consumer pending and idle time
+    consumers, _ := m.redis.XInfoConsumers(ctx, streamKey, group).Result()
+    for _, c := range consumers {
+        m.gauge.Set("redis_consumer_pending", float64(c.Pending), streamKey, group, c.Name)
+        m.gauge.Set("redis_consumer_idle_ms", float64(c.Idle), streamKey, group, c.Name)
+    }
+
+    // DLQ length
+    dlqLen, _ := m.redis.XLen(ctx, streamKey+":dlq").Result()
+    m.gauge.Set("redis_stream_dlq_length", float64(dlqLen), streamKey)
+}
+
+// For BLPop queues (connector-service)
+func (m *Monitor) collectQueueMetrics(ctx context.Context, queue string) {
+    // Queue depth
+    length, _ := m.redis.LLen(ctx, queue).Result()
+    m.gauge.Set("redis_queue_length", float64(length), queue)
+
+    // Delayed retry queue depth
+    delayedLen, _ := m.redis.ZCard(ctx, queue+":delayed").Result()
+    m.gauge.Set("redis_queue_delayed", float64(delayedLen), queue)
+}</code></pre>
+    <p>These metrics feed into Grafana dashboards with the following alert rules:</p>
+    <p><strong>Stream length &gt; 10,000:</strong> Consumers are falling behind. This triggers a warning alert. At 50,000, it becomes critical and pages on-call.</p>
+    <p><strong>Consumer idle &gt; 5 minutes:</strong> A consumer has stopped reading. This usually means the worker process crashed or is stuck in a deadlock. Critical alert.</p>
+    <p><strong>Pending count &gt; 1,000:</strong> Messages are being delivered but not acknowledged, indicating processing failures. Warning alert.</p>
+    <p><strong>DLQ length &gt; 50:</strong> Systematic failure pattern. This typically means an upstream dependency is down (OCR service unreachable, partner webhook endpoint changed) rather than individual bad messages. Critical alert with a link to the admin DLQ viewer.</p>
+    <p><strong>BLPop queue length &gt; 5,000:</strong> Webhook delivery is backed up. This usually indicates a slow partner endpoint causing the consumer to block on HTTP calls rather than processing jobs. Warning alert.</p>
+
+    <h2>Production Numbers</h2>
+    <p>Across all three services, the daily job volume is approximately 35,000 jobs: ~8,000 document processing jobs (VKYC), ~12,000 workflow events (engage-flow), and ~15,000 webhook deliveries (connector-service). The Redis instance is a single r6g.large (2 vCPU, 16GB) running Redis 7.0 with AOF persistence (everysec fsync). Memory usage for all streams and queues combined is under 200MB.</p>
+    <p>The document processing stream (VKYC) has a median processing time of 4.2 seconds per job and a P99 of 11 seconds. The DLQ rate is 0.3% -- mostly caused by corrupt image uploads that the OCR service cannot parse. The webhook delivery queue (connector-service) has a median delivery time of 380ms and a first-attempt success rate of 96.4%. The remaining 3.6% are retried successfully within 2 minutes, and less than 0.1% ever reach the DLQ.</p>
+    <p>Redis Streams will not replace Kafka for high-throughput event streaming at millions of messages per second. But for the 10K-100K jobs/day range with a Redis instance you already operate, they provide a remarkably capable distributed job processing system. And for even simpler needs, BLPop with a sorted-set delay queue gives you a production-grade retry system in under 100 lines of code.</p>
+  </article>
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-left"><p>&copy; 2026 Atul Gupta.</p></div>
+    <div class="footer-links">
+      <a href="https://github.com/akgnitd" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <a href="https://linkedin.com/in/akgnitd" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../assets/js/main.js"></script>
+<script src="../assets/js/backgrounds.js"></script>
+</body>
+</html>
