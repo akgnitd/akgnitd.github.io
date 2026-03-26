@@ -61,10 +61,10 @@
       <a href="../index.html#contact">Contact</a>
     </div>
     <div class="nav-actions">
-      <a href="../resume.pdf" class="btn btn-primary" target="_blank" rel="noopener noreferrer">
+      <!-- <a href="../resume.pdf" class="btn btn-primary" target="_blank" rel="noopener noreferrer">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Resume
-      </a>
+      </a> -->
       <button id="bgSwitcher" class="btn" style="padding: 0.5rem 0.9rem; margin-right: 0.5rem;" onclick="window.toggleBackgroundMode && window.toggleBackgroundMode()" title="Cycle Background Animation">🌍</button>
       <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark/light mode">
         <span class="icon-moon">🌙</span>
@@ -84,23 +84,322 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
       Back to Blog
     </a>
-    <p class="post-meta">March 21, 2026 · 6 min read</p>
+    <p class="post-meta">March 21, 2026 · 18 min read</p>
     <h1>Scaling with Golang</h1>
   </div>
 
   <article class="blog-post-content">
-    <p>In the fast-paced world of FinTech, performance isn't just a metric — it's a requirement. At Credit Saison, we faced a significant challenge: our core validation engines were struggling to handle the increasing volume of real-time transactions with the low latency our users expect. After extensive benchmarking, we made the strategic decision to transition mission-critical services to <strong>Golang</strong>.</p>
+    <p>It was 2 AM on a Wednesday, and I was staring at a Grafana dashboard that looked like a heart monitor having a panic attack. Our Scalet WebSocket service -- the backbone of our real-time agent collaboration platform -- was shedding connections like a dog in summer. P99 latency had ballooned from 120ms to over 900ms. The Spring Boot service was running 8 pods, each at 4GB heap, and we were still running out of threads. I remember thinking: "We have 6,000 concurrent WebSocket connections and a JVM that is fundamentally unhappy about it."</p>
 
-    <h2>Why Golang?</h2>
-    <p>Java has been our backbone for years, but the overhead of JVM and the complexity of managing thread pools at extreme scales became a bottleneck. Go's lightweight <strong>Goroutines</strong> allowed us to handle thousands of concurrent requests using minimal memory compared to traditional thread-based models.</p>
+    <p>That night was the catalyst. Not because the JVM was bad -- it had served us well for years -- but because we had hit a wall where the cost of scaling Java vertically and horizontally was becoming absurd. The next morning, I opened a design doc titled "The Case for Go" and started writing. Six months later, our most critical real-time services were running in Go, P99 latency had dropped 40%, and our infrastructure bill was noticeably lighter. Here is the full story.</p>
 
-    <h2>The Performance Gains</h2>
-    <p>The results were immediate. We observed a <strong>40% reduction in P99 latency</strong>. More importantly, our infrastructure costs dropped as we could process the same number of requests with fewer CPU and RAM resources. The simplicity of Go's concurrency model also reduced the bugs associated with complex multi-threaded Java applications.</p>
+    <h2>The Architecture That Broke</h2>
+
+    <p>Let me give you some context. At Credit Saison, we run two major platforms where concurrency is not negotiable:</p>
+
+    <p><strong>Scalet</strong> -- a real-time collaboration and communication platform where agents, supervisors, and customers connect via WebSockets. Think of it like a purpose-built Slack for financial operations, with live document sharing, typing indicators, and presence tracking. At peak, we handle 8,000+ simultaneous WebSocket connections across workspaces.</p>
+
+    <p><strong>VKYC (Video KYC)</strong> -- a regulatory-compliant video verification system where customers do live video calls with agents, submit identity documents, and get verified in real-time. The backend processes document images through OCR, runs tampering detection, and streams results back. This involves Redis Streams for job queuing, multiple worker pools, and tight latency SLAs because a customer is literally sitting there waiting on a video call.</p>
+
+    <p>Both services were originally written in Spring Boot. And both were struggling for the same fundamental reason: the thread-per-connection model does not scale gracefully when you need to hold thousands of long-lived connections while also doing CPU-intensive background work.</p>
+
+    <p>Here is what the Spring Boot WebSocket service looked like in production metrics:</p>
+
+    <ul>
+      <li>6,000 concurrent connections = ~6,000 threads (with Tomcat's default model)</li>
+      <li>Each thread: ~1MB stack size = 6GB just for thread stacks</li>
+      <li>JVM heap: 4GB per pod, 8 pods = 32GB total memory allocation</li>
+      <li>GC pauses: 50-200ms stop-the-world pauses under pressure</li>
+      <li>Context switching overhead: measurable at >4,000 threads</li>
+      <li>P99 latency: 120ms baseline, spiking to 900ms+ under load</li>
+    </ul>
+
+    <p>We tried everything within the Java ecosystem first. We switched to Netty-based WebSockets, tuned GC (G1GC, then ZGC), adjusted thread pool sizes, added connection pooling. Each change bought us maybe 15-20% improvement. But we were optimizing within a paradigm that was fundamentally wrong for our workload.</p>
+
+    <h2>Why Go, Specifically?</h2>
+
+    <p>The decision was not "Java bad, Go good." It was more nuanced than that. We evaluated three options seriously:</p>
+
+    <p><strong>Option 1: Stick with Java, use Project Loom virtual threads.</strong> This was tempting. Virtual threads would solve the thread-per-connection problem elegantly. But at the time, Loom was still in preview, and we could not bet production financial services on a preview feature. (If I were making this decision today, Loom would be a stronger contender.)</p>
+
+    <p><strong>Option 2: Rewrite in Rust.</strong> Incredible performance, zero-cost abstractions, no GC. But the learning curve was steep, our team had zero Rust experience, and hiring Rust engineers in the Indian FinTech market was nearly impossible. The juice was not worth the squeeze for our use case.</p>
+
+    <p><strong>Option 3: Rewrite in Go.</strong> Goroutines give us the concurrency model we need. The runtime is mature and battle-tested at scale (Docker, Kubernetes, and most of the cloud-native ecosystem run on Go). The language is simple enough that our Java engineers could become productive in 2-3 weeks. Compilation is fast, binaries are small, deployment is trivial.</p>
+
+    <p>We ran a 2-week proof-of-concept. One engineer rewrote the core WebSocket hub in Go. The results were so dramatic that the decision made itself.</p>
+
+    <h2>The Real Code: Scalet's WebSocket Hub</h2>
+
+    <p>Let me show you what the production WebSocket hub looks like. This is the central struct that manages all concurrent connections in Scalet:</p>
+
+    <pre><code>type Hub struct {
+    mu          sync.RWMutex
+    clients     map[string]*Client
+    broadcaster chan outgoingMessage
+    db          *sql.DB
+    config            *WebSocketConfig
+    connectionManager *ConnectionManager
+    metrics           *Metrics
+    rateLimiters      map[string]*rate.Limiter
+    workspaceClients map[string]map[string]*Client
+    heartbeatTicker *time.Ticker
+    ctx             context.Context
+    cancel          context.CancelFunc
+    connectionBreaker *CircuitBreaker
+}</code></pre>
+
+    <p>Let me walk you through why each field exists, because this struct is the result of about four months of iterative production learning.</p>
+
+    <p><strong><code>mu sync.RWMutex</code></strong> -- This is a read-write mutex. We use <code>RLock()</code> for broadcasting (which happens constantly -- typing indicators, presence updates) and <code>Lock()</code> only for connection/disconnection events. The read-write split was critical. Our first version used a plain <code>sync.Mutex</code> and we saw lock contention show up in pprof profiles almost immediately. With RWMutex, multiple goroutines can read the client map concurrently, and we only serialize on writes. This alone cut our broadcast latency by 60%.</p>
+
+    <p><strong><code>workspaceClients map[string]map[string]*Client</code></strong> -- This is a nested map: workspace ID to client ID to client. In our first version, broadcasting to a workspace meant iterating over ALL clients and filtering. With 8,000 connections across 200 workspaces, that is a lot of wasted iteration. This nested structure means workspace-scoped broadcasts only touch the relevant clients. O(workspace_size) instead of O(total_clients).</p>
+
+    <p><strong><code>rateLimiters map[string]*rate.Limiter</code></strong> -- Per-client rate limiting using Go's <code>golang.org/x/time/rate</code> package. We learned this the hard way: one misbehaving client SDK was sending 500 messages/second (a bug in their reconnection logic) and it was degrading the experience for everyone in that workspace. Now every client gets a token bucket rate limiter, configurable per workspace tier.</p>
+
+    <p><strong><code>connectionBreaker *CircuitBreaker</code></strong> -- When downstream dependencies (database, Redis) are unhealthy, we do not want new connections piling up and making things worse. The circuit breaker trips after 5 consecutive failures and rejects new connections with a clear error code for 30 seconds before trying again. This pattern saved us during a Redis failover event where, without the breaker, we would have had 8,000 goroutines all blocked on Redis timeouts simultaneously.</p>
+
+    <p>The beauty of this design is that each client connection is a single goroutine. 8,000 connections = 8,000 goroutines. In Go, a goroutine starts at about 2KB of stack space (and grows dynamically as needed). Compare that to Java's 1MB per thread. We went from 6GB of thread stacks to ~16MB of goroutine stacks. That is not a typo. It is a 375x reduction in per-connection memory overhead.</p>
+
+    <h2>The VKYC Worker: Redis Streams in Go</h2>
+
+    <p>The second major Go service is the VKYC document processing worker. When a customer submits an identity document during a video KYC session, we need to run OCR, tampering detection, and data extraction -- all while the customer and agent are on a live video call. Latency matters enormously here because a human is waiting.</p>
+
+    <p>The architecture is: the VKYC API receives the document, writes a job to a Redis Stream, and the Go worker picks it up, processes it, and writes results back. We use Redis Streams consumer groups for reliable, distributed processing with exactly-once semantics.</p>
+
+    <p>Here is the actual worker loop:</p>
+
+    <pre><code>func (w *worker) run(ctx context.Context) error {
+    for {
+        if ctx.Err() != nil { return ctx.Err() }
+
+        // First, reclaim any messages that other consumers
+        // started but didn't finish (crashed, timed out, etc.)
+        if err := w.claimStaleMessages(ctx); err != nil &&
+            !errors.Is(err, context.Canceled) {
+            log.Printf("stale-claim pass failed: %v", err)
+        }
+
+        streams, err := w.redis.XReadGroup(ctx, &redis.XReadGroupArgs{
+            Group:    documentConsumerGroup,
+            Consumer: w.cfg.consumerName,
+            Streams:  []string{documentJobStreamKey, ">"},
+            Count:    maxReadCount,
+            Block:    readBlockTimeout,
+        }).Result()
+
+        if err != nil {
+            if errors.Is(err, redis.Nil) { continue }
+            if errors.Is(err, context.Canceled) { return nil }
+            log.Printf("XReadGroup error: %v", err)
+            time.Sleep(backoffDuration)
+            continue
+        }
+
+        for _, stream := range streams {
+            for _, msg := range stream.Messages {
+                w.processMessage(ctx, msg)
+            }
+        }
+    }
+}</code></pre>
+
+    <p>A few things worth calling out here:</p>
+
+    <p><strong>Stale message claiming (<code>claimStaleMessages</code>)</strong> -- This is the unsung hero of reliable stream processing. When a worker crashes mid-processing, the message stays in its pending entries list (PEL) in Redis. The next worker that starts up calls <code>XAUTOCLAIM</code> to grab any messages that have been pending for more than 60 seconds. This gives us at-least-once delivery without any external coordination service. No ZooKeeper. No Kafka. Just Redis.</p>
+
+    <p><strong>The <code>">"</code> in the Streams slice</strong> -- This is Redis Streams syntax for "give me new messages that no consumer in this group has seen yet." It is what makes consumer groups work. Each message goes to exactly one consumer in the group.</p>
+
+    <p><strong>Block with timeout</strong> -- <code>readBlockTimeout</code> is set to 5 seconds. The worker blocks on Redis waiting for new messages, which means near-zero CPU usage when idle. This is much more efficient than polling.</p>
+
+    <p><strong>Why Redis Streams instead of Kafka?</strong> This is a question I get a lot. For our volume (a few thousand documents per day, not millions), Kafka's operational complexity was not justified. Redis Streams gives us consumer groups, message acknowledgment, dead letter handling (via the PEL), and we were already running Redis for caching. Adding a stream was a configuration change, not an infrastructure change.</p>
+
+    <p>The worker processes each message by spinning up a goroutine that calls into the Python AI service (OCR + tampering detection) via gRPC, waits for the result, writes it to the database, and acknowledges the Redis message. If processing fails, the message stays in the PEL and gets auto-claimed by another worker. Elegant and simple.</p>
+
+    <h2>Goroutines vs Threads: The Numbers That Actually Matter</h2>
+
+    <p>I have seen a lot of blog posts compare goroutines to threads using synthetic benchmarks. Let me share the numbers from our actual production services, because real-world numbers tell a different story than "hello world" benchmarks.</p>
+
+    <p><strong>Memory per connection:</strong></p>
+    <ul>
+      <li>Java (Spring Boot + Tomcat): ~1.2MB per WebSocket connection (thread stack + buffers + object overhead)</li>
+      <li>Go (gorilla/websocket + custom hub): ~12KB per WebSocket connection (goroutine stack + read/write buffers)</li>
+      <li>Ratio: ~100x less memory per connection in Go</li>
+    </ul>
+
+    <p><strong>Connection capacity per pod (2 vCPU, 4GB RAM):</strong></p>
+    <ul>
+      <li>Java: ~2,000 connections before GC pressure becomes problematic</li>
+      <li>Go: ~25,000 connections before we start seeing any degradation</li>
+      <li>In practice, we cap at 10,000 per pod for headroom</li>
+    </ul>
+
+    <p><strong>Startup time:</strong></p>
+    <ul>
+      <li>Java: 18-25 seconds (Spring context initialization, connection pool warm-up)</li>
+      <li>Go: 200-400 milliseconds</li>
+      <li>This matters more than you might think -- during a deployment rollout or autoscaling event, those 20 seconds of startup mean 20 seconds where the new pod is not serving traffic</li>
+    </ul>
+
+    <p><strong>P99 latency (message broadcast to 100 clients in same workspace):</strong></p>
+    <ul>
+      <li>Java: 85ms baseline, 340ms under load (GC spikes)</li>
+      <li>Go: 12ms baseline, 18ms under load</li>
+      <li>The consistency is what matters most -- Go's GC pauses are sub-millisecond and do not show up in our latency percentiles</li>
+    </ul>
+
+    <p><strong>Infrastructure cost (same workload):</strong></p>
+    <ul>
+      <li>Java: 8 pods x (2 vCPU, 4GB) = 16 vCPU, 32GB RAM</li>
+      <li>Go: 3 pods x (1 vCPU, 1GB) = 3 vCPU, 3GB RAM</li>
+      <li>That is an 80% reduction in compute resources for the same workload</li>
+    </ul>
+
+    <h2>The Cultural Shift: From Spring Boot OOP to Go Composition</h2>
+
+    <p>This was honestly the hardest part. Harder than the technical rewrite. Our team of 8 engineers had a combined ~40 years of Java experience. They thought in classes, inheritance hierarchies, dependency injection containers, and annotation-driven configuration. Go has none of that.</p>
+
+    <p>The first Go PR I reviewed from the team was basically Java written in Go. It had a "BaseService" struct with "ServiceImpl" structs embedding it, a "ServiceFactory" function, and interfaces with 15 methods. It compiled, it worked, but it was fighting the language at every turn.</p>
+
+    <p>Here is what I mean by the shift. In Java, we had something like this:</p>
+
+    <pre><code>// Java: Deep inheritance, DI container, annotations everywhere
+@Service
+public class WebSocketService extends BaseWebSocketService {
+    @Autowired
+    private ConnectionRepository connectionRepo;
+    @Autowired
+    private MetricsService metricsService;
+    @Autowired
+    private RateLimiterFactory rateLimiterFactory;
+
+    @Override
+    protected void onConnect(WebSocketSession session) {
+        // 200 lines of connection handling
+    }
+}</code></pre>
+
+    <p>In Go, the idiomatic approach is composition through embedding, explicit dependency passing, and small interfaces:</p>
+
+    <pre><code>// Go: Flat composition, explicit dependencies, small interfaces
+type Hub struct {
+    clients     map[string]*Client
+    metrics     *Metrics
+    rateLimiter RateLimiter // interface with 1 method: Allow(key string) bool
+    store       ConnectionStore // interface with 3 methods
+}
+
+func NewHub(store ConnectionStore, metrics *Metrics, rl RateLimiter) *Hub {
+    return &Hub{
+        clients:     make(map[string]*Client),
+        metrics:     metrics,
+        rateLimiter: rl,
+        store:       store,
+    }
+}</code></pre>
+
+    <p>The key shifts we had to internalize:</p>
+
+    <ul>
+      <li><strong>No inheritance, use composition.</strong> Instead of a base class, you embed structs. Instead of overriding methods, you implement interfaces. This felt limiting at first but leads to much more readable code because you can see exactly what a struct does by looking at its fields.</li>
+      <li><strong>Small interfaces, defined by the consumer.</strong> In Java, the service defines the interface. In Go, the consumer defines the interface. Your <code>Hub</code> does not care that the store is backed by PostgreSQL -- it only cares that it satisfies a 3-method interface. This makes testing trivial.</li>
+      <li><strong>Explicit is better than magical.</strong> No annotation scanning, no classpath scanning, no runtime proxy generation. You construct your dependency graph in <code>main()</code> and pass everything explicitly. It is more typing but you can always follow the code with grep.</li>
+      <li><strong>Error handling is verbose but visible.</strong> <code>if err != nil</code> everywhere. Our Java engineers hated this at first. But after a month, they noticed something: they were handling errors more thoughtfully. In Java, it was too easy to throw an exception and let some middleware catch it. In Go, you confront every error at the call site.</li>
+    </ul>
+
+    <p>We did a few things to smooth the transition:</p>
+
+    <ol>
+      <li><strong>Go study group</strong> -- 1 hour per week, we worked through "The Go Programming Language" by Donovan and Kernighan. Great book, no fluff.</li>
+      <li><strong>Pair programming for the first month</strong> -- Every Go PR had a pair. One person drives, the other asks "is there a more Go-like way to do this?"</li>
+      <li><strong>Style guide early</strong> -- We wrote a 2-page internal style guide covering our conventions: error wrapping with <code>fmt.Errorf("doing X: %w", err)</code>, table-driven tests, context propagation patterns.</li>
+      <li><strong>Gradual migration</strong> -- We did not rewrite everything at once. We started with the WebSocket hub (highest concurrency pressure), then the worker service, then supporting services. Java still runs our CRUD APIs where concurrency is not a bottleneck, and that is fine.</li>
+    </ol>
+
+    <h2>Production War Stories</h2>
+
+    <p><strong>The Goroutine Leak</strong></p>
+
+    <p>Three weeks after launching the Go WebSocket service, our monitoring showed goroutine count climbing steadily: 8,000... 12,000... 20,000... 50,000. Memory was climbing too. We had a goroutine leak.</p>
+
+    <p>The bug was subtle. When a client disconnected abnormally (network drop, no close frame), the read pump goroutine would exit, but the write pump goroutine was blocked on a channel send that would never be received. We were spawning two goroutines per client (read pump and write pump), and only one was being cleaned up.</p>
+
+    <p>The fix was adding a <code>done</code> channel to the Client struct:</p>
+
+    <pre><code>func (c *Client) writePump() {
+    defer c.conn.Close()
+    for {
+        select {
+        case msg, ok := <-c.send:
+            if !ok { return } // channel closed
+            c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+            if err := c.conn.WriteMessage(
+                websocket.TextMessage, msg,
+            ); err != nil {
+                return
+            }
+        case <-c.done:
+            return // client disconnected, exit cleanly
+        }
+    }
+}</code></pre>
+
+    <p>Lesson: in Go, every goroutine you spawn is your responsibility to clean up. There is no garbage collector for goroutines. If you start one, you must ensure there is a code path that terminates it. We now have a CI check that flags any <code>go func()</code> without an associated context or done channel.</p>
+
+    <p><strong>The Redis Streams Rebalancing Incident</strong></p>
+
+    <p>Our VKYC worker service runs 3 replicas in the consumer group. During a deployment rollout, the old pods shut down and new pods start up. For about 10 seconds, messages accumulate in the stream with no active consumers. When the new pods come up, they all call <code>XAUTOCLAIM</code> simultaneously and try to grab the same stale messages.</p>
+
+    <p>We ended up with duplicate processing -- the same document got OCR'd three times. The fix was two-fold: (1) add idempotency keys to the processing pipeline so duplicate processing is a no-op, and (2) add a random jitter to the stale-claim interval so workers do not all fire at the same instant after startup.</p>
+
+    <h2>The Performance Dashboard: Before and After</h2>
+
+    <p>Here are the actual numbers from our production monitoring, comparing the last month of the Java service to the first stable month of the Go service, same workload:</p>
+
+    <table>
+      <thead><tr><th>Metric</th><th>Java (Spring Boot)</th><th>Go</th><th>Improvement</th></tr></thead>
+      <tbody>
+        <tr><td>P50 latency (broadcast)</td><td>22ms</td><td>4ms</td><td>82%</td></tr>
+        <tr><td>P99 latency (broadcast)</td><td>340ms</td><td>18ms</td><td>95%</td></tr>
+        <tr><td>Memory per pod</td><td>3.8GB</td><td>180MB</td><td>95%</td></tr>
+        <tr><td>CPU per pod (avg)</td><td>1.4 cores</td><td>0.3 cores</td><td>79%</td></tr>
+        <tr><td>Pod count</td><td>8</td><td>3</td><td>63%</td></tr>
+        <tr><td>Startup time</td><td>22s</td><td>350ms</td><td>98%</td></tr>
+        <tr><td>Monthly compute cost</td><td>$2,400</td><td>$450</td><td>81%</td></tr>
+        <tr><td>Max connections/pod</td><td>2,000</td><td>10,000</td><td>400%</td></tr>
+      </tbody>
+    </table>
+
+    <p>The P99 improvement is the headline number, but the cost reduction is what got leadership's attention. We saved ~$23,000/year on just these two services. When you multiply that thinking across the platform, Go becomes a strategic infrastructure decision, not just a language preference.</p>
+
+    <h2>When NOT to Use Go</h2>
+
+    <p>I want to be honest about where Go is not the right choice, because I have seen too many "rewrite everything in Go" blog posts that ignore the trade-offs.</p>
+
+    <ul>
+      <li><strong>Complex business logic with deep domain models.</strong> Our loan origination service has 50+ entity types with complex relationships and validation rules. Java's type system, generics, and ecosystem (Hibernate, Spring Data) handle this beautifully. Go's type system would make this more verbose without clear benefit.</li>
+      <li><strong>Rapid prototyping.</strong> When we need to test a new product idea quickly, Python or Node.js gets us there faster. Go's explicitness is a virtue in production but a tax in prototyping.</li>
+      <li><strong>Teams with zero Go experience and tight deadlines.</strong> The transition took our team about 6 weeks to become truly productive. If you have a hard deadline in 4 weeks, rewriting in Go is not the answer.</li>
+    </ul>
+
+    <p>Our rule of thumb: Go for I/O-bound concurrent services (WebSockets, workers, API gateways). Java for complex domain services. Python for ML/AI services. Use the right tool for the job.</p>
 
     <h2>Lessons Learned</h2>
-    <p>Transitioning a team isn't just about syntax; it's about mindset. Moving from an OOP-heavy Spring Boot environment to Go's composition-based approach required a cultural shift. We focused on clear documentation and peer reviews to ensure our "Go-idiomatic" code remained maintainable and scalable.</p>
 
-    <p>Today, Go powers our most critical validation layers, enabling us to deliver lightning-fast financial decisions for millions of users.</p>
+    <p>After running Go in production for over a year now, here is what I would tell my past self:</p>
+
+    <ol>
+      <li><strong>Profile first, rewrite second.</strong> We wasted 2 weeks optimizing Java before deciding to switch. If we had profiled from day one, we would have seen that the bottleneck was fundamental (thread model) rather than tunable (GC settings). Use pprof, use flame graphs, let the data guide you.</li>
+      <li><strong>Invest in the <code>context</code> package from day one.</strong> Context propagation is how Go handles cancellation, timeouts, and request-scoped values. We retrofitted it after launch and it was painful. Thread it through from the start.</li>
+      <li><strong>Write table-driven tests.</strong> Go's testing ergonomics are excellent once you embrace table-driven tests. We have 340+ test cases for the Hub alone, and they run in under 2 seconds.</li>
+      <li><strong>Do not fight the language.</strong> If you find yourself writing a "framework" in Go, you are doing it wrong. Go is meant to be boring, explicit, and obvious. Embrace that.</li>
+      <li><strong>The <code>sync</code> package is your friend.</strong> <code>sync.RWMutex</code>, <code>sync.Once</code>, <code>sync.Pool</code>, <code>sync.Map</code> -- learn them all. They are the building blocks of concurrent Go, and they are surprisingly well-designed.</li>
+      <li><strong>Monitor goroutine count in production.</strong> It is the Go equivalent of thread count monitoring in Java. If it is growing unbounded, you have a leak. We alert if goroutine count exceeds 2x the expected connection count.</li>
+      <li><strong>Gradual migration is the way.</strong> Rewriting everything at once is a recipe for disaster. We migrated one service at a time, ran both old and new in parallel for a week with traffic mirroring, and cut over only when the Go service's metrics matched or beat the Java service across the board.</li>
+    </ol>
+
+    <p>Today, Go powers our real-time collaboration layer (Scalet), our document processing pipeline (VKYC workers), and our internal API gateway. Java still powers our domain-heavy services, and that is exactly right. The goal was never "Go everywhere" -- it was "the right tool for each workload." The 40% P99 improvement was the proof that we made the right call for the right services.</p>
+
+    <p>If you are sitting there at 2 AM watching your thread-based service struggle under concurrent load, give Go a serious look. But profile first. Always profile first.</p>
   </article>
 </main>
 
@@ -110,7 +409,7 @@
     <div class="footer-links">
       <a href="https://github.com/akgnitd" target="_blank" rel="noopener noreferrer">GitHub</a>
       <a href="https://linkedin.com/in/akgnitd" target="_blank" rel="noopener noreferrer">LinkedIn</a>
-      <a href="../resume.pdf" target="_blank" rel="noopener noreferrer">Resume</a>
+      <!-- <a href="../resume.pdf" target="_blank" rel="noopener noreferrer">Resume</a> -->
     </div>
   </div>
 </footer>

@@ -175,23 +175,34 @@
     }, { passive: true });
   }
 
-  // ---- Contact Form Handler ----
+  // ---- Contact Form Handler (AJAX submit to Formspree, stay on page) ----
   var contactForm = document.getElementById('contactForm');
   if (contactForm) {
     contactForm.addEventListener('submit', function (e) {
-      var formAction = contactForm.getAttribute('action');
-      // If no Formspree endpoint configured, fall back to mailto
-      if (!formAction || formAction.indexOf('YOUR_FORM_ID') !== -1) {
-        e.preventDefault();
-        var name = contactForm.querySelector('[name="name"]').value;
-        var email = contactForm.querySelector('[name="email"]').value;
-        var message = contactForm.querySelector('[name="message"]').value;
-        var subject = encodeURIComponent('Portfolio Contact from ' + name);
-        var body = encodeURIComponent('From: ' + name + ' (' + email + ')\n\n' + message);
-        window.location.href = 'mailto:akgnit7@gmail.com?subject=' + subject + '&body=' + body;
-        var status = document.getElementById('formStatus');
-        if (status) status.textContent = 'Opening your email client...';
-      }
+      e.preventDefault();
+      var status = document.getElementById('formStatus');
+      var submitBtn = contactForm.querySelector('button[type="submit"]');
+      var action = contactForm.getAttribute('action');
+
+      if (submitBtn) submitBtn.disabled = true;
+      if (status) status.textContent = 'Sending...';
+
+      fetch(action, {
+        method: 'POST',
+        body: new FormData(contactForm),
+        headers: { 'Accept': 'application/json' }
+      }).then(function (response) {
+        if (response.ok) {
+          if (status) status.textContent = 'Message sent! I\'ll get back to you soon.';
+          contactForm.reset();
+        } else {
+          if (status) status.textContent = 'Something went wrong. Please try again.';
+        }
+      }).catch(function () {
+        if (status) status.textContent = 'Network error. Please try again.';
+      }).finally(function () {
+        if (submitBtn) submitBtn.disabled = false;
+      });
     });
   }
 
@@ -236,6 +247,46 @@
       tags: ['Kubernetes', 'DevOps', 'Cloud', 'Infrastructure'],
       url: 'blogs/kubernetes-at-scale.html',
       readingTime: '6 min'
+    },
+    {
+      title: 'Building a WebRTC SFU for Video KYC',
+      date: '2026-02-20',
+      excerpt: 'How we built a Mediasoup-based WebRTC SFU for real-time video verification \u2014 handling NAT traversal, adaptive bitrate, and compliance recording.',
+      tags: ['WebRTC', 'Mediasoup', 'Video', 'Architecture'],
+      url: 'blogs/webrtc-video-kyc.html',
+      readingTime: '8 min'
+    },
+    {
+      title: 'Real-Time Messaging Architecture with Go',
+      date: '2026-02-15',
+      excerpt: 'Designing a WebSocket hub/client model in Go for a team communication platform \u2014 from connection management to Redis-backed clustering.',
+      tags: ['Golang', 'WebSocket', 'Architecture', 'Redis'],
+      url: 'blogs/realtime-messaging-go.html',
+      readingTime: '7 min'
+    },
+    {
+      title: 'Dynamic Mock Services: Testing Without Dependencies',
+      date: '2026-02-10',
+      excerpt: 'How we built a universal mock service platform with smart policy routing, latency simulation, and transparent proxying.',
+      tags: ['Java', 'Spring-Boot', 'Testing', 'DevEx'],
+      url: 'blogs/dynamic-mock-services.html',
+      readingTime: '6 min'
+    },
+    {
+      title: 'Serverless Portfolio Analytics with AWS Lambda',
+      date: '2026-02-05',
+      excerpt: 'Building a zero-maintenance finance calculator with Lambda, S3 data lake, EventBridge scheduling, and Terraform infrastructure as code.',
+      tags: ['AWS', 'Serverless', 'Terraform', 'React'],
+      url: 'blogs/serverless-portfolio-analytics.html',
+      readingTime: '6 min'
+    },
+    {
+      title: 'Redis Streams for Distributed Job Processing',
+      date: '2026-01-28',
+      excerpt: 'Using Redis Streams with consumer groups for reliable background job processing \u2014 from OCR pipelines to webhook delivery.',
+      tags: ['Redis', 'Architecture', 'Backend', 'Go'],
+      url: 'blogs/redis-streams-distributed-jobs.html',
+      readingTime: '7 min'
     }
   ];
 
@@ -269,7 +320,7 @@
   var blogFilter = document.getElementById('blogFilter');
 
   if (blogGrid && !blogFilter) {
-    blogPosts.forEach(function (post, i) {
+    blogPosts.slice(0, 3).forEach(function (post, i) {
       var card = createBlogCard(post, i, true);
       blogGrid.appendChild(card);
       if (!reducedMotion) observer.observe(card);

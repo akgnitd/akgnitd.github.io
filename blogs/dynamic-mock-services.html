@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dynamic Mock Services: Testing Without Dependencies — Atul Gupta</title>
+  <meta name="description" content="How we built a universal mock service platform with smart policy routing, latency simulation, and transparent proxying." />
+
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="https://akgnitd.github.io/blogs/dynamic-mock-services.html" />
+  <meta property="og:title" content="Dynamic Mock Services: Testing Without Dependencies — Atul Gupta" />
+  <meta property="og:description" content="How we built a universal mock service platform with smart policy routing, latency simulation, and transparent proxying." />
+  <meta property="og:image" content="https://akgnitd.github.io/assets/images/profile.jpg" />
+
+  <meta property="twitter:card" content="summary_large_image" />
+  <meta property="twitter:url" content="https://akgnitd.github.io/blogs/dynamic-mock-services.html" />
+  <meta property="twitter:title" content="Dynamic Mock Services: Testing Without Dependencies — Atul Gupta" />
+  <meta property="twitter:description" content="How we built a universal mock service platform with smart policy routing, latency simulation, and transparent proxying." />
+  <meta property="twitter:image" content="https://akgnitd.github.io/assets/images/profile.jpg" />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    "headline": "Dynamic Mock Services: Testing Without Dependencies",
+    "description": "How we built a universal mock service platform with smart policy routing, latency simulation, and transparent proxying.",
+    "author": {
+      "@type": "Person",
+      "name": "Atul Gupta",
+      "url": "https://akgnitd.github.io/"
+    },
+    "datePublished": "2026-02-10",
+    "image": "https://akgnitd.github.io/assets/images/profile.jpg"
+  }
+  </script>
+
+  <meta name="theme-color" content="#05070a" media="(prefers-color-scheme: dark)" />
+  <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)" />
+  <link rel="icon" type="image/svg+xml" href="../assets/images/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="../assets/css/main.css" />
+</head>
+<body>
+
+<a href="#main" class="skip-to-content">Skip to main content</a>
+<div class="reading-progress" id="readingProgress"></div>
+<canvas id="bg-canvas" class="bg-canvas"></canvas>
+
+<nav class="navbar" id="navbar">
+  <div class="container">
+    <a href="../index.html" class="nav-logo">atul<span>.</span></a>
+    <div class="nav-links" id="navLinks">
+      <a href="../index.html#about">About</a>
+      <a href="../index.html#skills">Skills</a>
+      <a href="../index.html#projects">Projects</a>
+      <a href="../blog.html" class="active">Blog</a>
+      <a href="../index.html#contact">Contact</a>
+    </div>
+    <div class="nav-actions">
+      <button id="bgSwitcher" class="btn" style="padding: 0.5rem 0.9rem; margin-right: 0.5rem;" onclick="window.toggleBackgroundMode && window.toggleBackgroundMode()" title="Cycle Background Animation">🌍</button>
+      <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark/light mode">
+        <span class="icon-moon">🌙</span>
+        <span class="icon-sun">☀️</span>
+      </button>
+      <button class="menu-toggle" id="menuToggle" aria-label="Open menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</nav>
+<div class="mobile-overlay" id="mobileOverlay"></div>
+
+<main id="main" class="blog-post-page">
+  <div class="blog-post-header">
+    <a href="../blog.html" class="back-link">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      Back to Blog
+    </a>
+    <p class="post-meta">February 10, 2026 · 18 min read</p>
+    <h1>Dynamic Mock Services: Testing Without Dependencies</h1>
+  </div>
+
+  <article class="blog-post-content">
+    <p>Every microservices team hits the same wall: you cannot test your service because the three services it depends on are down, broken, or rate-limited in the staging environment. Our platform integrates with over 20 external services -- payment gateways, Aadhaar verification APIs, credit bureaus, SMS providers, NSDL PAN validation, bank account verification, and more. Each has its own sandbox environment with its own reliability problems. On any given day, at least two sandboxes would be down, blocking QA entirely. Teams resorted to hardcoding mock responses in their application code, scattered across feature branches, never cleaned up, and a constant source of production incidents when someone forgot to remove a <code>if (env == "staging") return fakePANResponse()</code>.</p>
+    <p>We evaluated existing solutions: <strong>WireMock</strong>, <strong>MockServer</strong>, <strong>Hoverfly</strong>, and <strong>Mountebank</strong>. WireMock came closest to our needs with its request matching and response templating, but it fell short in three critical areas. First, it has no concept of stateful sequences where the response to the same request changes based on prior interactions (essential for payment flows). Second, its proxy mode is all-or-nothing rather than policy-driven (we needed to mock specific scenarios while proxying everything else to the real service simultaneously). Third, configuring it requires JSON stubs that developers must maintain in version control -- we needed a UI that QA engineers could operate without touching code. So we built our own: <strong>Simulation</strong>, a universal mock service platform with a policy engine, stateful sequences, transparent proxying, and a React UI bundled into a single Spring Boot JAR.</p>
+
+    <h2>The MockPolicy Data Model</h2>
+    <p>The foundation of the system is the <code>MockPolicy</code> entity. Every mock behaviour is expressed as a policy with match conditions and a response definition:</p>
+    <pre><code>@Entity
+@Table(name = "mock_policies")
+public class MockPolicy {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String name;
+    private String serviceName;       // e.g., "aadhaar-verification"
+    private String method;            // GET, POST, PUT, etc.
+    private String pathPattern;       // /api/v1/verify, supports wildcards
+
+    private Integer priority;         // Lower number = higher priority
+    private Boolean active;
+
+    @Enumerated(EnumType.STRING)
+    private PolicyType type;          // STATIC, SEQUENCE, PROXY
+
+    @Column(columnDefinition = "jsonb")
+    private String conditions;        // JSON array of match conditions
+
+    @Column(columnDefinition = "jsonb")
+    private String responseConfig;    // Response template, status, headers
+
+    private Integer latencyMinMs;     // Minimum simulated latency
+    private Integer latencyMaxMs;     // Maximum simulated latency
+    private Double failureRate;       // 0.0 to 1.0, percentage of requests that get error response
+
+    @Column(columnDefinition = "jsonb")
+    private String failureResponse;   // Response to return on simulated failure
+
+    private String proxyUpstreamUrl;  // For PROXY type policies
+
+    @Column(columnDefinition = "jsonb")
+    private String sequenceConfig;    // For SEQUENCE type: ordered list of responses
+
+    private Long sequenceTtlSeconds;  // Auto-reset sequence state after this duration
+    private String sequenceKeyField;  // JSON path to extract the state key (e.g., "$.orderId")
+}</code></pre>
+    <p>The <code>conditions</code> field stores a JSON array of match conditions with AND/OR composition. The <code>responseConfig</code> stores the response template including HTTP status, headers, and body with dynamic placeholders. The <code>sequenceConfig</code> stores an ordered array of responses for stateful flows. This single entity covers all three mock modes: static responses, stateful sequences, and transparent proxying. PostgreSQL's JSONB columns give us flexible schema for the configuration data while keeping the relational structure for queries like "find all active policies for service X ordered by priority."</p>
+
+    <h2>The Policy Evaluation Engine</h2>
+    <p>When an incoming request hits the mock service, the policy engine evaluates all active policies for the matching service and path, ordered by priority. Here is the core condition evaluation logic from the Simulation codebase:</p>
+    <pre><code>private boolean checkCondition(List&lt;SeqCondition&gt; seqConditions, Object source) {
+    if (seqConditions == null || seqConditions.isEmpty()) {
+        return true; // No conditions = always match
+    }
+
+    for (SeqCondition condition : seqConditions) {
+        String actualValue = extractValue(source, condition.getField());
+        String expectedValue = condition.getValue();
+
+        boolean matched = switch (condition.getOperation()) {
+            case EQUALS -&gt;
+                actualValue != null &amp;&amp; actualValue.equals(expectedValue);
+            case CONTAINS -&gt;
+                actualValue != null &amp;&amp; actualValue.contains(expectedValue);
+            case REGEX -&gt;
+                actualValue != null &amp;&amp; Pattern.compile(expectedValue).matcher(actualValue).matches();
+            case EXISTS -&gt;
+                actualValue != null;
+            case NOT_EXISTS -&gt;
+                actualValue == null;
+            case GREATER_THAN -&gt;
+                actualValue != null &amp;&amp; Double.parseDouble(actualValue) &gt; Double.parseDouble(expectedValue);
+        };
+
+        if (condition.isNegate()) {
+            matched = !matched;
+        }
+
+        if (!matched) {
+            return false; // AND logic: all conditions must match
+        }
+    }
+    return true;
+}</code></pre>
+    <p>The six operations cover the vast majority of matching scenarios we encounter in production. <code>EQUALS</code> handles exact matches on headers, query parameters, and JSON body fields -- used for routing by API key, endpoint, or specific identifiers. <code>CONTAINS</code> is the substring match we use for matching partial request bodies, like any Aadhaar verification request containing a specific state code in the address field. <code>REGEX</code> gives full pattern matching for PAN card formats (<code>[A-Z]{5}[0-9]{4}[A-Z]</code>), phone numbers, or complex XML structures in SOAP requests from legacy bank integrations. <code>EXISTS</code> and <code>NOT_EXISTS</code> check field presence regardless of value -- essential for routing based on optional headers like <code>X-Idempotency-Key</code> or <code>X-Request-Priority</code>. <code>GREATER_THAN</code> was added for amount-based routing: mock a timeout for transactions above 100,000 INR while returning success for smaller amounts.</p>
+    <p>The <code>extractValue</code> method supports dot-notation JSON paths (<code>body.customer.address.state</code>), header extraction (<code>header.X-Api-Key</code>), query parameter extraction (<code>query.version</code>), and path variable extraction (<code>path.0</code> for the first path segment). The <code>negate</code> flag on each condition allows inverse matching without needing separate NOT_EQUALS, NOT_CONTAINS, etc. operations, keeping the operation set minimal.</p>
+    <p>All conditions within a single policy are combined with AND logic (every condition must match). For OR logic, you create multiple policies with the same response -- the priority system ensures the first matching policy wins. This keeps the evaluation model simple and predictable: policies are tried in order, and the first complete match produces the response.</p>
+
+    <h2>Stateful Sequence Management</h2>
+    <p>Some APIs are inherently stateful. A payment flow requires: create order (returns orderId with status "created"), check status (returns "processing"), check again (returns "completed"). A credit bureau check returns "initiated" on first call, then "report_ready" on subsequent polls. A simple request-response mock cannot model these multi-step interactions.</p>
+    <p>Our sequence management uses a <code>ConcurrentHashMap</code> keyed by a configurable field extracted from the request:</p>
+    <pre><code>@Component
+public class SequenceStateManager {
+
+    private final ConcurrentHashMap&lt;String, SequenceState&gt; stateMap
+        = new ConcurrentHashMap&lt;&gt;();
+
+    public MockResponse getNextResponse(MockPolicy policy, Object requestBody) {
+        String keyField = policy.getSequenceKeyField(); // e.g., "$.orderId"
+        String keyValue = JsonPath.read(requestBody, keyField).toString();
+        String stateKey = policy.getId() + ":" + keyValue;
+
+        SequenceState state = stateMap.compute(stateKey, (k, existing) -&gt; {
+            if (existing == null || existing.isExpired()) {
+                return new SequenceState(0, Instant.now(), policy.getSequenceTtlSeconds());
+            }
+            int nextIndex = Math.min(existing.getCurrentIndex() + 1,
+                policy.getSequenceResponses().size() - 1);
+            return new SequenceState(nextIndex, existing.getCreatedAt(),
+                policy.getSequenceTtlSeconds());
+        });
+
+        return policy.getSequenceResponses().get(state.getCurrentIndex());
+    }
+
+    @Scheduled(fixedRate = 60_000)
+    public void cleanupExpiredStates() {
+        stateMap.entrySet().removeIf(e -&gt; e.getValue().isExpired());
+    }
+}</code></pre>
+    <p>The state key is a composite of <code>policyId:extractedKeyValue</code>. This means multiple concurrent test flows using different order IDs maintain independent sequence positions. When QA Engineer A creates an order with ID "order-123" and QA Engineer B creates one with "order-456", their respective status check sequences advance independently.</p>
+    <p>The <code>ConcurrentHashMap.compute</code> method provides atomic read-modify-write semantics. If no state exists for the key (first request in the sequence), a new state is created at index 0. If state exists, the index advances to the next response. The <code>Math.min</code> clamp prevents index-out-of-bounds: once the sequence reaches the last response, it stays there for all subsequent requests. This models the real-world behaviour where a payment status eventually settles on "completed" and stays there.</p>
+    <p>The TTL-based expiry (configured per policy, typically 5-30 minutes) ensures that abandoned test flows do not leak state indefinitely. The scheduled cleanup runs every 60 seconds and removes expired entries. In production, the state map rarely exceeds a few hundred entries since most test flows complete within minutes.</p>
+
+    <h2>Dynamic Placeholder Resolution</h2>
+    <p>Static mock responses get stale fast. If your Aadhaar verification mock always returns the same name regardless of input, your UI tests cannot verify that the correct data flows through the system. Our mock responses support dynamic placeholders that map request fields to response fields at runtime:</p>
+    <pre><code>public class PlaceholderResolver {
+
+    private static final Pattern PLACEHOLDER_PATTERN =
+        Pattern.compile("\\{\\{(.+?)}}");
+
+    public String resolve(String template, HttpServletRequest request, Object body) {
+        return PLACEHOLDER_PATTERN.matcher(template).replaceAll(match -&gt; {
+            String expression = match.group(1).trim();
+
+            // Request field references
+            if (expression.startsWith("request.body.")) {
+                String jsonPath = "$." + expression.substring("request.body.".length());
+                return JsonPath.read(body, jsonPath).toString();
+            }
+            if (expression.startsWith("request.header.")) {
+                return request.getHeader(expression.substring("request.header.".length()));
+            }
+            if (expression.startsWith("request.query.")) {
+                return request.getParameter(expression.substring("request.query.".length()));
+            }
+
+            // Helper functions
+            if (expression.startsWith("randomInt")) {
+                String[] parts = expression.split("\\s+");
+                int min = Integer.parseInt(parts[1]);
+                int max = Integer.parseInt(parts[2]);
+                return String.valueOf(ThreadLocalRandom.current().nextInt(min, max + 1));
+            }
+            if (expression.equals("timestamp")) {
+                return Instant.now().toString();
+            }
+            if (expression.equals("uuid")) {
+                return UUID.randomUUID().toString();
+            }
+            if (expression.startsWith("dateOffset")) {
+                String[] parts = expression.split("\\s+");
+                int days = Integer.parseInt(parts[1]);
+                return LocalDate.now().plusDays(days).toString();
+            }
+
+            return match.group(0); // Unknown placeholder, leave as-is
+        });
+    }
+}</code></pre>
+    <p>A mock response template for a PAN verification API might look like:</p>
+    <pre><code>{
+    "status": "success",
+    "pan": "{{request.body.panNumber}}",
+    "name": "{{request.body.fullName}}",
+    "verificationId": "{{uuid}}",
+    "verifiedAt": "{{timestamp}}",
+    "validUntil": "{{dateOffset 365}}",
+    "referenceNumber": "PAN-{{randomInt 100000 999999}}"
+}</code></pre>
+    <p>When a request arrives with <code>{"panNumber": "ABCDE1234F", "fullName": "Rahul Sharma"}</code>, the resolved response contains the actual PAN number and name from the request, a fresh UUID, the current timestamp, a date one year from now, and a random 6-digit reference number. This makes mock responses realistic enough for full end-to-end testing, including UI validation that the correct data flows through the entire pipeline.</p>
+
+    <h2>Transparent Proxy Mode</h2>
+    <p>The transparent proxy is the feature that made adoption across teams effortless. When a policy has type <code>PROXY</code>, or when no policy matches and the service has a default upstream configured, the request is forwarded to the real service:</p>
+    <pre><code>public ResponseEntity&lt;String&gt; proxyRequest(HttpServletRequest request,
+                                              String upstreamUrl,
+                                              byte[] body) {
+    // Build upstream request preserving method, headers, and body
+    HttpHeaders headers = extractForwardHeaders(request);
+    headers.set("X-Forwarded-For", request.getRemoteAddr());
+    headers.set("X-Mock-Proxy", "simulation");
+
+    RequestEntity&lt;byte[]&gt; upstream = new RequestEntity&lt;&gt;(
+        body, headers,
+        HttpMethod.valueOf(request.getMethod()),
+        URI.create(upstreamUrl + request.getRequestURI()
+            + (request.getQueryString() != null ? "?" + request.getQueryString() : ""))
+    );
+
+    try {
+        ResponseEntity&lt;String&gt; response = restTemplate.exchange(upstream, String.class);
+
+        // Log the real response for potential mock creation
+        auditLog.logProxyResponse(request, response);
+
+        return ResponseEntity
+            .status(response.getStatusCode())
+            .headers(response.getHeaders())
+            .body(response.getBody());
+    } catch (HttpClientErrorException | HttpServerErrorException e) {
+        auditLog.logProxyError(request, e);
+        return ResponseEntity
+            .status(e.getStatusCode())
+            .body(e.getResponseBodyAsString());
+    } catch (ResourceAccessException e) {
+        auditLog.logProxyTimeout(request, e);
+        return ResponseEntity
+            .status(HttpStatus.GATEWAY_TIMEOUT)
+            .body("{\"error\": \"upstream_timeout\", \"message\": \"" + e.getMessage() + "\"}");
+    }
+}</code></pre>
+    <p>The proxy adds <code>X-Forwarded-For</code> for upstream logging and <code>X-Mock-Proxy: simulation</code> so the upstream service can distinguish proxied requests from direct calls if needed. The <code>extractForwardHeaders</code> method copies all request headers except <code>Host</code> (which must reflect the upstream, not the mock service) and hop-by-hop headers like <code>Connection</code> and <code>Transfer-Encoding</code>.</p>
+    <p>The audit log captures both the request and the real upstream response. From the Simulation UI, QA engineers can browse these logged interactions and convert any real response into a mock policy with a single click. This workflow is the fastest path from "I need to mock this specific scenario" to "it is mocked": start the proxy, trigger the real flow, find the response you want in the log, click "Create Mock From Response," adjust the conditions, and save. No JSON editing, no file commits, no redeployments.</p>
+
+    <h2>Latency Simulation and Failure Injection</h2>
+    <p>A mock that responds in 1ms does not tell you how your service behaves when the real API takes 800ms. Each policy can be configured with latency bounds and a failure rate:</p>
+    <pre><code>private void applyLatencyAndFailure(MockPolicy policy, HttpServletResponse response)
+        throws IOException, InterruptedException {
+
+    // Simulate latency
+    if (policy.getLatencyMinMs() != null &amp;&amp; policy.getLatencyMaxMs() != null) {
+        int delay = ThreadLocalRandom.current()
+            .nextInt(policy.getLatencyMinMs(), policy.getLatencyMaxMs() + 1);
+        Thread.sleep(delay);
+    }
+
+    // Simulate failures
+    if (policy.getFailureRate() != null &amp;&amp; policy.getFailureRate() &gt; 0) {
+        if (ThreadLocalRandom.current().nextDouble() &lt; policy.getFailureRate()) {
+            String failureBody = policy.getFailureResponse() != null
+                ? policy.getFailureResponse()
+                : "{\"error\": \"simulated_failure\"}";
+            response.setStatus(HttpStatus.INTERNAL_SERVER_ERROR.value());
+            response.getWriter().write(failureBody);
+            return;
+        }
+    }
+}</code></pre>
+    <p>Setting <code>latencyMinMs: 200, latencyMaxMs: 800</code> produces a uniform random delay between 200ms and 800ms on every request. Setting <code>failureRate: 0.1</code> causes 10% of requests to return a 500 error with the configured failure response body. This combination has caught multiple production-critical bugs: a payment service that did not implement retry logic for transient failures, an SMS provider integration with a 3-second timeout that was too aggressive for the real API's P95 latency, and a circuit breaker that was configured with a threshold too low for the upstream's normal error rate.</p>
+
+    <h2>The Unified JAR Build</h2>
+    <p>The entire platform deploys as a single executable JAR. The React frontend is built during the Maven package phase and its output is copied into the Spring Boot static resources directory:</p>
+    <pre><code>&lt;!-- pom.xml excerpt --&gt;
+&lt;plugin&gt;
+    &lt;groupId&gt;com.github.eirslett&lt;/groupId&gt;
+    &lt;artifactId&gt;frontend-maven-plugin&lt;/artifactId&gt;
+    &lt;version&gt;1.15.0&lt;/version&gt;
+    &lt;configuration&gt;
+        &lt;workingDirectory&gt;src/main/frontend&lt;/workingDirectory&gt;
+        &lt;nodeVersion&gt;v20.11.0&lt;/nodeVersion&gt;
+    &lt;/configuration&gt;
+    &lt;executions&gt;
+        &lt;execution&gt;
+            &lt;id&gt;install-node-npm&lt;/id&gt;
+            &lt;goals&gt;&lt;goal&gt;install-node-and-npm&lt;/goal&gt;&lt;/goals&gt;
+        &lt;/execution&gt;
+        &lt;execution&gt;
+            &lt;id&gt;npm-install&lt;/id&gt;
+            &lt;goals&gt;&lt;goal&gt;npm&lt;/goal&gt;&lt;/goals&gt;
+            &lt;configuration&gt;&lt;arguments&gt;ci&lt;/arguments&gt;&lt;/configuration&gt;
+        &lt;/execution&gt;
+        &lt;execution&gt;
+            &lt;id&gt;npm-build&lt;/id&gt;
+            &lt;goals&gt;&lt;goal&gt;npm&lt;/goal&gt;&lt;/goals&gt;
+            &lt;configuration&gt;&lt;arguments&gt;run build&lt;/arguments&gt;&lt;/configuration&gt;
+        &lt;/execution&gt;
+    &lt;/executions&gt;
+&lt;/plugin&gt;
+
+&lt;plugin&gt;
+    &lt;artifactId&gt;maven-resources-plugin&lt;/artifactId&gt;
+    &lt;executions&gt;
+        &lt;execution&gt;
+            &lt;id&gt;copy-frontend-build&lt;/id&gt;
+            &lt;phase&gt;generate-resources&lt;/phase&gt;
+            &lt;goals&gt;&lt;goal&gt;copy-resources&lt;/goal&gt;&lt;/goals&gt;
+            &lt;configuration&gt;
+                &lt;outputDirectory&gt;${project.build.directory}/classes/static&lt;/outputDirectory&gt;
+                &lt;resources&gt;
+                    &lt;resource&gt;
+                        &lt;directory&gt;src/main/frontend/build&lt;/directory&gt;
+                    &lt;/resource&gt;
+                &lt;/resources&gt;
+            &lt;/configuration&gt;
+        &lt;/execution&gt;
+    &lt;/executions&gt;
+&lt;/plugin&gt;</code></pre>
+    <p>The <code>frontend-maven-plugin</code> downloads Node.js and npm during the build, runs <code>npm ci</code> for deterministic dependency installation, and executes the React build. The <code>maven-resources-plugin</code> copies the build output to Spring Boot's static directory. The result is a single <code>simulation.jar</code> that serves both the React SPA (at the root path) and the mock API (under <code>/api</code>). No separate frontend deployment, no CORS configuration, no nginx reverse proxy, no Docker compose with multiple containers. Teams download the JAR, run <code>java -jar simulation.jar</code>, and have a fully functional mock service with UI at <code>http://localhost:8080</code>.</p>
+
+    <h2>CodePipeline Deployment</h2>
+    <p>The Simulation service runs on ECS Fargate behind an internal ALB. The CI/CD pipeline is AWS CodePipeline with three stages:</p>
+    <pre><code># buildspec.yml
+version: 0.2
+phases:
+  install:
+    runtime-versions:
+      java: corretto17
+  build:
+    commands:
+      - mvn clean package -DskipTests
+      - docker build -t simulation:${CODEBUILD_RESOLVED_SOURCE_VERSION} .
+      - aws ecr get-login-password | docker login --username AWS --password-stdin $ECR_REPO
+      - docker tag simulation:${CODEBUILD_RESOLVED_SOURCE_VERSION} $ECR_REPO:latest
+      - docker push $ECR_REPO:latest
+  post_build:
+    commands:
+      - printf '[{"name":"simulation","imageUri":"%s:latest"}]' $ECR_REPO &gt; imagedefinitions.json
+artifacts:
+  files:
+    - imagedefinitions.json</code></pre>
+    <p>CodePipeline watches the main branch, triggers CodeBuild to package the JAR and build the Docker image, pushes to ECR, and then ECS performs a rolling update with the new image. The entire pipeline from git push to live deployment takes about 4 minutes. The Fargate task runs with 1 vCPU and 2GB memory, which handles our staging environment load (approximately 50 configured services with 200+ policies) comfortably.</p>
+
+    <h2>Real-World Impact</h2>
+    <p>Since deploying Simulation, our QA team's dependency-blocked time dropped from an average of 3.2 hours per sprint to effectively zero. The platform currently mocks 23 external services with 340 active policies across 6 teams. The most complex service (a bank's payment gateway) has 28 policies covering success flows, various decline codes, timeout scenarios, partial failures, and a 5-step sequence that models the complete payment lifecycle from initiation through settlement.</p>
+    <p>The investment paid for itself within the first month when we caught a payment retry bug: our service was retrying on HTTP 409 Conflict (which the payment gateway returns for duplicate idempotency keys), causing double charges. This bug was invisible in the real sandbox because the sandbox never returned 409. With Simulation, we added a policy that returns 409 when the <code>X-Idempotency-Key</code> header matches a previously seen value, and the bug surfaced immediately.</p>
+  </article>
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <div class="footer-left"><p>&copy; 2026 Atul Gupta.</p></div>
+    <div class="footer-links">
+      <a href="https://github.com/akgnitd" target="_blank" rel="noopener noreferrer">GitHub</a>
+      <a href="https://linkedin.com/in/akgnitd" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+    </div>
+  </div>
+</footer>
+
+<script src="../assets/js/main.js"></script>
+<script src="../assets/js/backgrounds.js"></script>
+</body>
+</html>
